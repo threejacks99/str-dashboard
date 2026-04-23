@@ -1,26 +1,34 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0D2C54;
+  --primary: #FF7767;
+  --secondary: #0D2C54;
+  --muted: #f3f4f6;
+  --border: #e5e7eb;
+  --radius: 0.5rem;
+
+  /* Hostics brand colors */
+  --hostics-coral: #FF7767;
+  --hostics-navy: #0D2C54;
+  --hostics-white: #FFFFFF;
+  --hostics-sage: #BDD9BF;
+  --hostics-amber: #FFC857;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Raleway', sans-serif;
+  background: #F8F9FB;
+  color: #0D2C54;
 }
