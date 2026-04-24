@@ -13,6 +13,8 @@ import {
 interface MonthlyRevenue {
   month: string
   revenue: number
+  nights: number
+  netAdr: number
 }
 
 interface Props {
@@ -24,8 +26,29 @@ function formatYAxis(value: number) {
   return `$${value}`
 }
 
-function formatTooltip(value: number) {
-  return [`$${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 'Owner Payout']
+function fmt$(n: number) {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  const { revenue, nights, netAdr } = payload[0].payload as MonthlyRevenue
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #eee',
+      borderRadius: '8px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      padding: '10px 14px',
+      fontSize: '13px',
+      lineHeight: '1.7',
+    }}>
+      <div style={{ fontWeight: 700, color: '#0D2C54', marginBottom: '4px' }}>{label}</div>
+      <div style={{ color: '#555' }}>Owner Payout: <strong>{fmt$(revenue)}</strong></div>
+      <div style={{ color: '#555' }}>Nights: <strong>{nights}</strong></div>
+      <div style={{ color: '#555' }}>Net ADR: <strong>{fmt$(netAdr)}</strong></div>
+    </div>
+  )
 }
 
 export default function RevenueChart({ data }: Props) {
@@ -52,8 +75,8 @@ export default function RevenueChart({ data }: Props) {
         <AreaChart data={data} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
           <defs>
             <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#FF7767" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#FF7767" stopOpacity={0} />
+              <stop offset="5%" stopColor="#0D2C54" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#0D2C54" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -71,23 +94,17 @@ export default function RevenueChart({ data }: Props) {
             width={48}
           />
           <Tooltip
-            formatter={formatTooltip}
-            contentStyle={{
-              borderRadius: '8px',
-              border: '1px solid #eee',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              fontSize: '13px',
-            }}
-            cursor={{ stroke: '#FF7767', strokeWidth: 1, strokeDasharray: '4 4' }}
+            content={<CustomTooltip />}
+            cursor={{ stroke: '#0D2C54', strokeWidth: 1, strokeDasharray: '4 4' }}
           />
           <Area
             type="monotone"
             dataKey="revenue"
-            stroke="#FF7767"
+            stroke="#0D2C54"
             strokeWidth={2}
             fill="url(#revenueGradient)"
             dot={false}
-            activeDot={{ r: 4, fill: '#FF7767', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: '#0D2C54', strokeWidth: 0 }}
           />
         </AreaChart>
       </ResponsiveContainer>

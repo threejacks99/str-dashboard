@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import RevenueChart from './components/RevenueChart'
+import ExpensesByCategoryChart from './components/ExpensesByCategoryChart'
 
 async function getDashboardData() {
   const { data: reservations } = await supabase
@@ -99,21 +100,38 @@ const avgLeadTime = totalBookings > 0
       }, 0) / totalBookings
   : 0
 
-  const monthlyRevenueMap: Record<string, number> = {}
+  const monthlyMap: Record<string, { revenue: number; nights: number }> = {}
   for (const r of performanceReservations) {
     const date = new Date(r.check_in)
     if (isNaN(date.getTime())) continue
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    monthlyRevenueMap[key] = (monthlyRevenueMap[key] || 0) + (r.owner_payout || 0)
+    if (!monthlyMap[key]) monthlyMap[key] = { revenue: 0, nights: 0 }
+    monthlyMap[key].revenue += r.owner_payout || 0
+    monthlyMap[key].nights += r.nights || 0
   }
-  const monthlyRevenue = Object.keys(monthlyRevenueMap)
+  const monthlyRevenue = Object.keys(monthlyMap)
     .sort()
     .map(key => {
       const [year, month] = key.split('-')
       const label = new Date(Number(year), Number(month) - 1, 1)
         .toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-      return { month: label, revenue: Math.round(monthlyRevenueMap[key]) }
+      const { revenue, nights } = monthlyMap[key]
+      return {
+        month: label,
+        revenue: Math.round(revenue),
+        nights,
+        netAdr: nights > 0 ? Math.round(revenue / nights) : 0,
+      }
     })
+
+  const expenseCategoryMap: Record<string, number> = {}
+  for (const e of expenses) {
+    const cat = e.category?.trim() || 'Uncategorized'
+    expenseCategoryMap[cat] = (expenseCategoryMap[cat] || 0) + (e.amount || 0)
+  }
+  const expensesByCategory = Object.entries(expenseCategoryMap)
+    .map(([category, amount]) => ({ category, amount: Math.round(amount) }))
+    .sort((a, b) => b.amount - a.amount)
 
   const kpis = [
     { label: 'Total Income', value: formatCurrency(totalIncome), color: '#0D2C54' },
@@ -184,6 +202,9 @@ const avgLeadTime = totalBookings > 0
 
       {/* Monthly Revenue Chart */}
       <RevenueChart data={monthlyRevenue} />
+
+      {/* Expenses by Category Chart */}
+      <ExpensesByCategoryChart data={expensesByCategory} />
     </div>
   )
 }
