@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase'
 import RevenueChart from './components/RevenueChart'
 import ExpensesByCategoryChart from './components/ExpensesByCategoryChart'
+import BookingSourceChart from './components/BookingSourceChart'
+import BookingsByDayChart from './components/BookingsByDayChart'
 
 async function getDashboardData() {
   const { data: reservations } = await supabase
@@ -133,6 +135,31 @@ const avgLeadTime = totalBookings > 0
     .map(([category, amount]) => ({ category, amount: Math.round(amount) }))
     .sort((a, b) => b.amount - a.amount)
 
+  const sourceCountMap: Record<string, number> = {}
+  for (const r of performanceReservations) {
+    const source = r.booking_source?.trim() || 'Unknown'
+    sourceCountMap[source] = (sourceCountMap[source] || 0) + 1
+  }
+  const totalBookingSourceCount = Object.values(sourceCountMap).reduce((s, n) => s + n, 0)
+  const bookingsBySource = Object.entries(sourceCountMap)
+    .map(([source, count]) => ({
+      source,
+      count,
+      percentage: totalBookingSourceCount > 0 ? (count / totalBookingSourceCount) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const dayCountMap: Record<string, number> = Object.fromEntries(DAYS.map(d => [d, 0]))
+  for (const r of performanceReservations) {
+    const date = new Date(r.check_in)
+    if (isNaN(date.getTime())) continue
+    // getDay(): 0=Sun,1=Mon,...,6=Sat — shift to Mon=0
+    const dayIndex = (date.getDay() + 6) % 7
+    dayCountMap[DAYS[dayIndex]]++
+  }
+  const bookingsByDay = DAYS.map(day => ({ day: day.slice(0, 3), count: dayCountMap[day] }))
+
   const kpis = [
     { label: 'Total Income', value: formatCurrency(totalIncome), color: '#0D2C54' },
     { label: 'Total Expenses', value: formatCurrency(totalExpenses), color: '#FF7767' },
@@ -205,6 +232,12 @@ const avgLeadTime = totalBookings > 0
 
       {/* Expenses by Category Chart */}
       <ExpensesByCategoryChart data={expensesByCategory} />
+
+      {/* Booking Source + Day of Week */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
+        <BookingSourceChart data={bookingsBySource} />
+        <BookingsByDayChart data={bookingsByDay} />
+      </div>
     </div>
   )
 }
