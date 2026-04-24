@@ -46,7 +46,7 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-export default function ExpensesByCategoryChart({ data }: Props) {
+export default function ExpensesChart({ data }: Props) {
   const barHeight = 36
   const chartHeight = Math.max(data.length * barHeight + 40, 120)
   const maxLabelLen = Math.max(...data.map(d => d.category.length), 8)

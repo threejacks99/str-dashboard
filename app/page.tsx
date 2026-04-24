@@ -1,107 +1,113 @@
-import { supabase } from '../lib/supabase'
-import RevenueChart from './components/RevenueChart'
-import ExpensesByCategoryChart from './components/ExpensesByCategoryChart'
-import BookingSourceChart from './components/BookingSourceChart'
-import BookingsByDayChart from './components/BookingsByDayChart'
+import Link from 'next/link'
+import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds } from '../lib/auth'
+import KpiCards from './components/dashboard/KpiCards'
+import RevenueChart from './components/dashboard/RevenueChart'
+import ExpensesChart from './components/dashboard/ExpensesChart'
+import BookingSourceChart from './components/dashboard/BookingSourceChart'
+import DayOfWeekChart from './components/dashboard/DayOfWeekChart'
 
-async function getDashboardData() {
-  const { data: reservations } = await supabase
-    .from('reservations')
-    .select('*')
-
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('*')
-
-  return { reservations: reservations || [], expenses: expenses || [] }
-}
-
-function formatCurrency(value: number): string {
-  if (value < 0) {
-    return `($${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})`
-  }
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-}
-
-function formatPercent(value: number): string {
-  if (value < 0) {
-    return `(${Math.abs(value).toFixed(1)}%)`
-  }
-  return `${value.toFixed(1)}%`
+function EmptyState() {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '60vh',
+      textAlign: 'center',
+    }}>
+      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
+        Welcome to Hostics!
+      </h2>
+      <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
+        You don't have any data yet. Upload your first CSV to get started.
+      </p>
+      <Link href="/upload" style={{
+        background: '#FF7767',
+        color: '#fff',
+        padding: '12px 28px',
+        borderRadius: '8px',
+        fontSize: '15px',
+        fontWeight: '700',
+        textDecoration: 'none',
+        fontFamily: 'Raleway, sans-serif',
+      }}>
+        Upload your first CSV
+      </Link>
+    </div>
+  )
 }
 
 export default async function DashboardPage() {
-  const { reservations, expenses } = await getDashboardData()
+  const supabase = await createAuthenticatedClient()
 
-  const isOwnerStay = (r: any) =>
-    ['OWN', 'Own', 'own'].includes(r.booking_source)
+  // ── Determine what this user can see ──────────────────────────────────────
+  const userAccount = await getCurrentUserAccount()
+  const clientIds = await getAccessibleClientIds(userAccount)
 
-  const isCancelled = (r: any) =>
-    ['cancelled', 'Cancelled'].includes(r.status)
+  if (!clientIds.length) return <EmptyState />
 
-  const performanceReservations = reservations.filter(r =>
-    !isOwnerStay(r) && !isCancelled(r)
-  )
+  const { data: properties } = await supabase
+    .from('properties')
+    .select('id')
+    .in('client_id', clientIds)
 
-  const totalIncome = reservations
+  const propertyIds = (properties ?? []).map((p: { id: string }) => p.id)
+
+  if (!propertyIds.length) return <EmptyState />
+
+  // ── Fetch data scoped to this user's properties ────────────────────────────
+  const [{ data: reservations }, { data: expenses }] = await Promise.all([
+    supabase.from('reservations').select('*').in('property_id', propertyIds),
+    supabase.from('expenses').select('*').in('property_id', propertyIds),
+  ])
+
+  const allReservations = reservations ?? []
+  const allExpenses = expenses ?? []
+
+  // ── Filters ───────────────────────────────────────────────────────────────
+  const isOwnerStay = (r: any) => ['OWN', 'Own', 'own'].includes(r.booking_source)
+  const isCancelled = (r: any) => ['cancelled', 'Cancelled'].includes(r.status)
+  const performanceReservations = allReservations.filter(r => !isOwnerStay(r) && !isCancelled(r))
+
+  // ── KPI metrics ───────────────────────────────────────────────────────────
+  const totalIncome = allReservations
     .filter(r => !isOwnerStay(r))
     .reduce((sum, r) => sum + (r.owner_payout || 0), 0)
 
-  const totalGrossRent = performanceReservations
-    .reduce((sum, r) => sum + (r.gross_rent || 0), 0)
-
-  const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
+  const totalGrossRent = performanceReservations.reduce((sum, r) => sum + (r.gross_rent || 0), 0)
+  const totalExpenses = allExpenses.reduce((sum, e) => sum + (e.amount || 0), 0)
   const noi = totalIncome - totalExpenses
   const oer = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0
-
-  const performanceNights = performanceReservations
-    .reduce((sum, r) => sum + (r.nights || 0), 0)
-
+  const performanceNights = performanceReservations.reduce((sum, r) => sum + (r.nights || 0), 0)
   const adr = performanceNights > 0 ? totalGrossRent / performanceNights : 0
-  const checkInDates = performanceReservations
-  .map(r => new Date(r.check_in))
-  .filter(d => !isNaN(d.getTime()))
 
-const checkOutDates = performanceReservations
-  .map(r => new Date(r.check_out))
-  .filter(d => !isNaN(d.getTime()))
+  const today = new Date()
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(today.getFullYear() - 1)
+  const last12MonthsNights = performanceReservations
+    .filter(r => { const d = new Date(r.check_in); return d >= twelveMonthsAgo && d <= today })
+    .reduce((sum, r) => sum + (r.nights || 0), 0)
+  const occupancyRate = (last12MonthsNights / 365) * 100
 
-const earliestDate = new Date(Math.min(...checkInDates.map(d => d.getTime())))
-const latestDate = new Date(Math.max(...checkOutDates.map(d => d.getTime())))
-const today = new Date()
-const twelveMonthsAgo = new Date()
-twelveMonthsAgo.setFullYear(today.getFullYear() - 1)
-
-const last12MonthsReservations = performanceReservations.filter(r => {
-  const checkIn = new Date(r.check_in)
-  return checkIn >= twelveMonthsAgo && checkIn <= today
-})
-
-const last12MonthsNights = last12MonthsReservations
-  .reduce((sum, r) => sum + (r.nights || 0), 0)
-
-const occupancyRate = (last12MonthsNights / 365) * 100
   const totalBookings = performanceReservations.length
-const avgNightsPerBooking = totalBookings > 0
-  ? performanceNights / totalBookings
-  : 0
+  const avgNightsPerBooking = totalBookings > 0 ? performanceNights / totalBookings : 0
+  const avgGuestsPerBooking = totalBookings > 0
+    ? performanceReservations.reduce((sum, r) => sum + (r.adult_guests || 0) + (r.child_guests || 0), 0) / totalBookings
+    : 0
+  const avgLeadTime = totalBookings > 0
+    ? performanceReservations
+        .filter(r => r.booking_created_at && r.check_in)
+        .reduce((sum, r) => {
+          const days = Math.ceil(
+            (new Date(r.check_in).getTime() - new Date(r.booking_created_at).getTime()) / (1000 * 60 * 60 * 24)
+          )
+          return sum + (days > 0 ? days : 0)
+        }, 0) / totalBookings
+    : 0
 
-const avgGuestsPerBooking = totalBookings > 0
-  ? performanceReservations.reduce((sum, r) =>
-      sum + (r.adult_guests || 0) + (r.child_guests || 0), 0) / totalBookings
-  : 0
-
-const avgLeadTime = totalBookings > 0
-  ? performanceReservations
-      .filter(r => r.booking_created_at && r.check_in)
-      .reduce((sum, r) => {
-        const created = new Date(r.booking_created_at)
-        const checkIn = new Date(r.check_in)
-        const days = Math.ceil((checkIn.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-        return sum + (days > 0 ? days : 0)
-      }, 0) / totalBookings
-  : 0
-
+  // ── Monthly revenue chart data ─────────────────────────────────────────────
   const monthlyMap: Record<string, { revenue: number; nights: number }> = {}
   for (const r of performanceReservations) {
     const date = new Date(r.check_in)
@@ -118,16 +124,12 @@ const avgLeadTime = totalBookings > 0
       const label = new Date(Number(year), Number(month) - 1, 1)
         .toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       const { revenue, nights } = monthlyMap[key]
-      return {
-        month: label,
-        revenue: Math.round(revenue),
-        nights,
-        netAdr: nights > 0 ? Math.round(revenue / nights) : 0,
-      }
+      return { month: label, revenue: Math.round(revenue), nights, netAdr: nights > 0 ? Math.round(revenue / nights) : 0 }
     })
 
+  // ── Expenses by category chart data ───────────────────────────────────────
   const expenseCategoryMap: Record<string, number> = {}
-  for (const e of expenses) {
+  for (const e of allExpenses) {
     const cat = e.category?.trim() || 'Uncategorized'
     expenseCategoryMap[cat] = (expenseCategoryMap[cat] || 0) + (e.amount || 0)
   }
@@ -135,108 +137,62 @@ const avgLeadTime = totalBookings > 0
     .map(([category, amount]) => ({ category, amount: Math.round(amount) }))
     .sort((a, b) => b.amount - a.amount)
 
+  // ── Booking source chart data ──────────────────────────────────────────────
   const sourceCountMap: Record<string, number> = {}
   for (const r of performanceReservations) {
     const source = r.booking_source?.trim() || 'Unknown'
     sourceCountMap[source] = (sourceCountMap[source] || 0) + 1
   }
-  const totalBookingSourceCount = Object.values(sourceCountMap).reduce((s, n) => s + n, 0)
+  const totalSourceCount = Object.values(sourceCountMap).reduce((s, n) => s + n, 0)
   const bookingsBySource = Object.entries(sourceCountMap)
     .map(([source, count]) => ({
       source,
       count,
-      percentage: totalBookingSourceCount > 0 ? (count / totalBookingSourceCount) * 100 : 0,
+      percentage: totalSourceCount > 0 ? (count / totalSourceCount) * 100 : 0,
     }))
     .sort((a, b) => b.count - a.count)
 
+  // ── Day of week chart data ─────────────────────────────────────────────────
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const dayCountMap: Record<string, number> = Object.fromEntries(DAYS.map(d => [d, 0]))
   for (const r of performanceReservations) {
     const date = new Date(r.check_in)
     if (isNaN(date.getTime())) continue
     // getDay(): 0=Sun,1=Mon,...,6=Sat — shift to Mon=0
-    const dayIndex = (date.getDay() + 6) % 7
-    dayCountMap[DAYS[dayIndex]]++
+    dayCountMap[DAYS[(date.getDay() + 6) % 7]]++
   }
   const bookingsByDay = DAYS.map(day => ({ day: day.slice(0, 3), count: dayCountMap[day] }))
-
-  const kpis = [
-    { label: 'Total Income', value: formatCurrency(totalIncome), color: '#0D2C54' },
-    { label: 'Total Expenses', value: formatCurrency(totalExpenses), color: '#FF7767' },
-    { label: 'NOI', value: formatCurrency(noi), color: noi >= 0 ? '#0D2C54' : '#FF7767' },
-    { label: 'OER', value: formatPercent(oer), color: '#FF7767' },
-    { label: 'Average Daily Rate', value: `$${adr.toFixed(0)}`, color: '#0D2C54' },
-    { label: 'Occupancy Rate (12mo)', value: formatPercent(occupancyRate), color: occupancyRate >= 50 ? '#0D2C54' : '#FF7767' },
-    { label: 'Total Bookings', value: totalBookings.toString(), color: '#0D2C54' },
-    { label: 'Total Nights', value: performanceNights.toString(), color: '#0D2C54' },
-    { label: 'Avg Nights per Booking', value: avgNightsPerBooking.toFixed(1), color: '#0D2C54' },
-    { label: 'Avg Guests per Booking', value: avgGuestsPerBooking.toFixed(1), color: '#0D2C54' },
-    { label: 'Avg Booking Lead Time', value: `${Math.round(avgLeadTime)} days`, color: '#0D2C54' },
-  ]
 
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
-        <h1 style={{
-          fontSize: '26px',
-          fontWeight: '800',
-          color: '#0D2C54',
-          marginBottom: '4px'
-        }}>
+        <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
           Siesta Palms
         </h1>
-        <p style={{ color: '#888', fontSize: '14px' }}>
-          Performance overview · All time
-        </p>
+        <p style={{ color: '#888', fontSize: '14px' }}>Performance overview · All time</p>
       </div>
 
-      {/* KPI Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '40px'
-      }}>
-        {kpis.map((kpi, i) => (
-          <div key={i} style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '20px 24px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-            border: '1px solid #eee',
-          }}>
-            <div style={{
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#888',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: '8px'
-            }}>
-              {kpi.label}
-            </div>
-            <div style={{
-              fontSize: '28px',
-              fontWeight: '800',
-              color: kpi.color,
-              letterSpacing: '-0.5px'
-            }}>
-              {kpi.value}
-            </div>
-          </div>
-        ))}
-      </div>
+      <KpiCards
+        totalIncome={totalIncome}
+        totalExpenses={totalExpenses}
+        noi={noi}
+        oer={oer}
+        adr={adr}
+        occupancyRate={occupancyRate}
+        totalBookings={totalBookings}
+        performanceNights={performanceNights}
+        avgNightsPerBooking={avgNightsPerBooking}
+        avgGuestsPerBooking={avgGuestsPerBooking}
+        avgLeadTime={avgLeadTime}
+      />
 
-      {/* Monthly Revenue Chart */}
       <RevenueChart data={monthlyRevenue} />
 
-      {/* Expenses by Category Chart */}
-      <ExpensesByCategoryChart data={expensesByCategory} />
+      <ExpensesChart data={expensesByCategory} />
 
-      {/* Booking Source + Day of Week */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
         <BookingSourceChart data={bookingsBySource} />
-        <BookingsByDayChart data={bookingsByDay} />
+        <DayOfWeekChart data={bookingsByDay} />
       </div>
     </div>
   )

@@ -11,6 +11,8 @@ interface Props {
   data: DayCount[]
 }
 
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
@@ -29,7 +31,11 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-export default function BookingsByDayChart({ data }: Props) {
+export default function DayOfWeekChart({ data }: Props) {
+  const sorted = [...data].sort(
+    (a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day)
+  )
+
   return (
     <div style={{
       background: '#ffffff',
@@ -49,7 +55,7 @@ export default function BookingsByDayChart({ data }: Props) {
         Check-ins by Day of Week
       </div>
       <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barCategoryGap="30%">
+        <BarChart data={sorted} margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barCategoryGap="30%">
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
           <XAxis
             dataKey="day"
@@ -66,7 +72,7 @@ export default function BookingsByDayChart({ data }: Props) {
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(13,44,84,0.04)' }} />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-            {data.map((_, i) => (
+            {sorted.map((_, i) => (
               <Cell key={i} fill="#0D2C54" />
             ))}
           </Bar>

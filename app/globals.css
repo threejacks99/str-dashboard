@@ -32,3 +32,8 @@ body {
   background: #F8F9FB;
   color: #0D2C54;
 }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

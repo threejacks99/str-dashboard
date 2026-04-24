@@ -1,6 +1,6 @@
 'use client'
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface BookingSource {
   source: string
@@ -13,6 +13,16 @@ interface Props {
 }
 
 const COLORS = ['#FF7767', '#0D2C54', '#BDD9BF', '#FFC857']
+
+const SOURCE_NAMES: Record<string, string> = {
+  'SC-ABnB': 'Airbnb',
+  'HAFamOLB': 'Direct',
+  'STA': 'Other',
+}
+
+function displayName(source: string): string {
+  return SOURCE_NAMES[source] ?? source
+}
 
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
@@ -27,7 +37,7 @@ function CustomTooltip({ active, payload }: any) {
       fontSize: '13px',
       lineHeight: '1.7',
     }}>
-      <div style={{ fontWeight: 700, color: '#0D2C54', marginBottom: '4px' }}>{source}</div>
+      <div style={{ fontWeight: 700, color: '#0D2C54', marginBottom: '4px' }}>{displayName(source)}</div>
       <div style={{ color: '#555' }}>Bookings: <strong>{count}</strong></div>
       <div style={{ color: '#555' }}>Share: <strong>{percentage.toFixed(1)}%</strong></div>
     </div>
@@ -46,7 +56,7 @@ function CustomLegend({ data }: { data: BookingSource[] }) {
             background: COLORS[i % COLORS.length],
             flexShrink: 0,
           }} />
-          <span style={{ color: '#555', flex: 1 }}>{entry.source}</span>
+          <span style={{ color: '#555', flex: 1 }}>{displayName(entry.source)}</span>
           <span style={{ color: '#0D2C54', fontWeight: 700 }}>{entry.percentage.toFixed(1)}%</span>
         </div>
       ))}
