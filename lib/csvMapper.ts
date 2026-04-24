@@ -14,14 +14,14 @@ export const COLUMN_MAPPINGS: Record<string, string[]> = {
     'type', 'platform', 'channel', 'source',
     'booking source', 'booking channel'
   ],
-check_in: [
-  'arrive', 'arrive ', ' arrive', 'arrival', 'check in', 'check-in',
-  'checkin', 'start date', 'from', 'check in date', 'arrival date'
-],
-check_out: [
-  'depart', 'depart ', ' depart', 'departure', 'check out', 'check-out',
-  'checkout', 'end date', 'to', 'check out date', 'departure date'
-],
+  check_in: [
+    'arrive', 'arrive ', ' arrive', 'arrival', 'check in', 'check-in',
+    'checkin', 'start date', 'from', 'check in date', 'arrival date'
+  ],
+  check_out: [
+    'depart', 'depart ', ' depart', 'departure', 'check out', 'check-out',
+    'checkout', 'end date', 'to', 'check out date', 'departure date'
+  ],
   nights: [
     'nights', 'nights stayed', 'length of stay', 'duration'
   ],
@@ -31,16 +31,16 @@ check_out: [
   child_guests: [
     'child guests', 'children', 'kids', 'child count'
   ],
-gross_rent: [
-  'rent', 'gross rent', 'total', 'gross amount',
-  'booking amount', 'total rent', 'rental amount',
-  'rate', 'total rate', 'accommodation fare'
-],
-owner_payout: [
-  'owner commission', 'owner payout', 'net payout',
-  'you earned', 'host payout', 'payout', 'net amount',
-  'owner earnings', 'earnings'
-],
+  gross_rent: [
+    'rent', 'gross rent', 'total', 'gross amount',
+    'booking amount', 'total rent', 'rental amount',
+    'rate', 'total rate', 'accommodation fare'
+  ],
+  owner_payout: [
+    'owner commission', 'owner payout', 'net payout',
+    'you earned', 'host payout', 'payout', 'net amount',
+    'owner earnings', 'earnings'
+  ],
   mgmt_fee: [
     'management commission', 'management fee',
     'mgmt fee', 'management', 'pm fee'
@@ -80,8 +80,8 @@ export function mapRow(
     if (['nights', 'adult_guests', 'child_guests'].includes(standardField)) {
       mapped[standardField] = value ? parseInt(value) : 0
     } else if (['gross_rent', 'owner_payout', 'mgmt_fee'].includes(standardField)) {
-  const cleaned = value ? parseFloat(value.replace(/[$,\s]/g, '')) : 0
-  mapped[standardField] = isNaN(cleaned) ? 0 : cleaned
+      const cleaned = value ? parseFloat(value.replace(/[$,\s]/g, '')) : 0
+      mapped[standardField] = isNaN(cleaned) ? 0 : cleaned
     } else if (['check_in', 'check_out'].includes(standardField)) {
       mapped[standardField] = value || null
     } else if (['booking_created_at'].includes(standardField)) {
@@ -158,8 +158,14 @@ export function mapExpenseRow(
     const value = row[originalHeader]?.trim() ?? null
 
     if (standardField === 'amount') {
-      const cleaned = value ? parseFloat(value.replace(/[$,\s]/g, '')) : 0
-      mapped[standardField] = isNaN(cleaned) ? 0 : cleaned
+      if (!value) {
+        mapped[standardField] = 0
+      } else {
+        const isNegative = value.startsWith('-') || value.startsWith('(')
+        const cleaned = value.replace(/[$,\s()]/g, '')
+        const parsed = parseFloat(cleaned)
+        mapped[standardField] = isNaN(parsed) ? 0 : (isNegative ? -parsed : parsed)
+      }
     } else if (standardField === 'paid_date') {
       mapped[standardField] = value || null
     } else {
