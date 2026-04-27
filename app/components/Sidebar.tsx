@@ -7,6 +7,7 @@ const navItems = [
   { label: 'Dashboard', href: '/', icon: '📊' },
   { label: 'Financials', href: '/financials', icon: '💰' },
   { label: 'Bookings', href: '/bookings', icon: '📅' },
+  { label: 'Properties', href: '/properties', icon: '🏠' },
   { label: 'Import Data', href: '/upload', icon: '📁' },
 ]
 
@@ -51,7 +52,9 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav style={{ padding: '16px 12px', flex: 1 }}>
         {navItems.map(item => {
-          const isActive = pathname === item.href
+          const isActive = item.href === '/'
+            ? pathname === '/'
+            : pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link
               key={item.href}

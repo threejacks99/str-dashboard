@@ -37,3 +37,9 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+input::placeholder,
+textarea::placeholder {
+  color: #B0B0B0;
+  font-style: italic;
+}
