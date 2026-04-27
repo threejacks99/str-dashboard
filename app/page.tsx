@@ -6,6 +6,45 @@ import ExpensesChart from './components/dashboard/ExpensesChart'
 import BookingSourceChart from './components/dashboard/BookingSourceChart'
 import DayOfWeekChart from './components/dashboard/DayOfWeekChart'
 
+// ── Date range helpers ─────────────────────────────────────────────────────────
+function getDateRangeFromParams(params: { from?: string; to?: string; preset?: string }): {
+  from: string
+  to: string
+  label: string
+} {
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  const preset = params.preset ?? 'last_12_months'
+
+  if (preset === 'custom' && params.from && params.to) {
+    const fmt = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return { from: params.from, to: params.to, label: `${fmt(params.from)} – ${fmt(params.to)}` }
+  }
+
+  if (preset === 'all_time') {
+    return { from: '2000-01-01', to: todayStr, label: 'All time' }
+  }
+
+  if (preset === 'last_year') {
+    const y = today.getFullYear() - 1
+    return { from: `${y}-01-01`, to: `${y}-12-31`, label: 'Last year' }
+  }
+
+  if (preset === 'year_to_date') {
+    return { from: `${today.getFullYear()}-01-01`, to: todayStr, label: 'Year to date' }
+  }
+
+  const subDays = (n: number) => { const d = new Date(today); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
+  const subMonths = (n: number) => { const d = new Date(today); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 10) }
+
+  switch (preset) {
+    case 'last_30_days': return { from: subDays(30),    to: todayStr, label: 'Last 30 days' }
+    case 'last_90_days': return { from: subDays(90),    to: todayStr, label: 'Last 90 days' }
+    case 'last_6_months': return { from: subMonths(6),  to: todayStr, label: 'Last 6 months' }
+    default:             return { from: subMonths(12),  to: todayStr, label: 'Last 12 months' }
+  }
+}
+
 function EmptyState() {
   return (
     <div style={{
@@ -39,8 +78,14 @@ function EmptyState() {
   )
 }
 
-export default async function DashboardPage() {
-  const supabase = await createAuthenticatedClient()
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string; preset?: string }>
+}) {
+  const params     = await searchParams
+  const dateRange  = getDateRangeFromParams(params)
+  const supabase   = await createAuthenticatedClient()
 
   // ── Determine what this user can see ──────────────────────────────────────
   const userAccount = await getCurrentUserAccount()
@@ -57,10 +102,12 @@ export default async function DashboardPage() {
 
   if (!propertyIds.length) return <EmptyState />
 
-  // ── Fetch data scoped to this user's properties ────────────────────────────
+  // ── Fetch data scoped to this user's properties + date range ─────────────
   const [{ data: reservations }, { data: expenses }] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', propertyIds),
-    supabase.from('expenses').select('*').in('property_id', propertyIds),
+    supabase.from('reservations').select('*').in('property_id', propertyIds)
+      .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
+    supabase.from('expenses').select('*').in('property_id', propertyIds)
+      .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to),
   ])
 
   const allReservations = reservations ?? []
@@ -83,13 +130,10 @@ export default async function DashboardPage() {
   const performanceNights = performanceReservations.reduce((sum, r) => sum + (r.nights || 0), 0)
   const adr = performanceNights > 0 ? totalGrossRent / performanceNights : 0
 
-  const today = new Date()
-  const twelveMonthsAgo = new Date()
-  twelveMonthsAgo.setFullYear(today.getFullYear() - 1)
-  const last12MonthsNights = performanceReservations
-    .filter(r => { const d = new Date(r.check_in); return d >= twelveMonthsAgo && d <= today })
-    .reduce((sum, r) => sum + (r.nights || 0), 0)
-  const occupancyRate = (last12MonthsNights / 365) * 100
+  const rangeDays = Math.max(1, Math.round(
+    (new Date(dateRange.to + 'T00:00:00').getTime() - new Date(dateRange.from + 'T00:00:00').getTime()) / 86400000
+  ) + 1)
+  const occupancyRate = (performanceNights / rangeDays) * 100
 
   const totalBookings = performanceReservations.length
   const avgNightsPerBooking = totalBookings > 0 ? performanceNights / totalBookings : 0
@@ -169,7 +213,7 @@ export default async function DashboardPage() {
         <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
           Siesta Palms
         </h1>
-        <p style={{ color: '#888', fontSize: '14px' }}>Performance overview · All time</p>
+        <p style={{ color: '#888', fontSize: '14px' }}>Performance overview · {dateRange.label}</p>
       </div>
 
       <KpiCards

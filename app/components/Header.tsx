@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import DateRangeFilter from './DateRangeFilter'
 
 export default function Header() {
-  const router = useRouter()
+  const router   = useRouter()
+  const pathname = usePathname()
   const [email, setEmail] = useState<string | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -50,9 +52,19 @@ export default function Header() {
       padding: '16px 32px',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'flex-end',
+      justifyContent: 'space-between',
       flexShrink: 0,
     }}>
+      {/* Left: date range filter (dashboard only) */}
+      <div>
+        {pathname === '/' && (
+          <Suspense fallback={null}>
+            <DateRangeFilter />
+          </Suspense>
+        )}
+      </div>
+
+      {/* Right: user avatar */}
       {email && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '13px', color: '#666' }}>{email}</span>
@@ -130,3 +142,4 @@ export default function Header() {
     </header>
   )
 }
+

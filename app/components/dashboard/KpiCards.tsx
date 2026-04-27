@@ -51,12 +51,12 @@ export default function KpiCards({
     { label: 'NOI', value: formatCurrency(noi), color: noi >= 0 ? '#0D2C54' : '#FF7767' },
     { label: 'OER', value: formatPercent(oer), color: '#FF7767' },
     { label: 'Average Daily Rate', value: `$${adr.toFixed(0)}`, color: '#0D2C54' },
-    { label: 'Occupancy Rate (12mo)', value: formatPercent(occupancyRate), color: occupancyRate >= 50 ? '#0D2C54' : '#FF7767' },
+    { label: 'Occupancy Rate', value: formatPercent(occupancyRate), color: occupancyRate >= 50 ? '#0D2C54' : '#FF7767' },
     { label: 'Total Bookings', value: totalBookings.toString(), color: '#0D2C54' },
     { label: 'Total Nights', value: performanceNights.toString(), color: '#0D2C54' },
     { label: 'Avg Nights per Booking', value: avgNightsPerBooking.toFixed(1), color: '#0D2C54' },
     { label: 'Avg Guests per Booking', value: avgGuestsPerBooking.toFixed(1), color: '#0D2C54' },
-    { label: 'Avg Booking Lead Time', value: `${Math.round(avgLeadTime)} days`, color: '#0D2C54' },
+    { label: 'Avg Days Booked Ahead', value: `${Math.round(avgLeadTime)} days`, color: '#0D2C54' },
   ]
 
   return (
