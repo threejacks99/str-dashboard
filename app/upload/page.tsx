@@ -1,18 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import { mapColumns, mapRow, detectFileType, mapExpenseColumns, mapExpenseRow } from '../../lib/csvMapper'
 import { supabase } from '../../lib/supabase'
 import PropertyForm from '../components/PropertyForm'
 
+// ── Types ──────────────────────────────────────────────────────────────────────
 interface Property {
   id: string
   name: string
 }
 
-// ── Shared style tokens ────────────────────────────────────────────────────────
+interface InvalidRow {
+  index: number
+  reason: string
+}
+
+interface UploadHistoryRow {
+  id: string
+  upload_type: string
+  filename: string | null
+  row_count: number
+  uploaded_at: string
+  properties: { name: string } | null
+}
+
+// ── Style tokens ───────────────────────────────────────────────────────────────
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '12px',
@@ -36,58 +51,216 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+const cardStyle: React.CSSProperties = {
+  background: '#fff',
+  border: '1px solid #eee',
+  borderRadius: '12px',
+  padding: '20px 24px',
+  marginBottom: '24px',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+}
+
+const thStyle: React.CSSProperties = {
+  padding: '9px 14px',
+  textAlign: 'left',
+  fontWeight: '600',
+  color: '#888',
+  fontSize: '11px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  borderBottom: '1px solid #eee',
+  background: '#F5F7FA',
+}
+
+const tdStyle: React.CSSProperties = {
+  padding: '10px 14px',
+  color: '#444',
+  fontSize: '13px',
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const BATCH_SIZE = 50
+
+function friendlyError(msg: string): string {
+  if (!msg) return 'An unknown error occurred. Please try again.'
+  if (msg.includes('duplicate key value')) return 'Some rows already exist and were skipped.'
+  if (msg.includes('violates not-null constraint')) {
+    const col = msg.match(/column "(.+?)"/)?.[1]
+    return col ? `Required column "${col}" is missing or empty.` : 'A required column is missing or empty.'
+  }
+  if (/network|fetch|failed to fetch/i.test(msg)) return 'Connection issue. Please check your network and try again.'
+  return msg
+}
+
+function plural(n: number, word: string) {
+  return `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default function UploadPage() {
+  // Properties
   const [properties, setProperties]           = useState<Property[]>([])
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('')
+  const [selectedPropertyId, setSelectedPropertyId] = useState('')
   const [primaryClientId, setPrimaryClientId] = useState<string | null>(null)
   const [propertiesLoading, setPropertiesLoading] = useState(true)
   const [showCreateForm, setShowCreateForm]   = useState(false)
 
-  const [status, setStatus]       = useState<string>('')
-  const [preview, setPreview]     = useState<any[]>([])
-  const [parsedRows, setParsedRows] = useState<any[]>([])
-  const [fileType, setFileType]   = useState<'reservations' | 'expenses' | 'unknown' | null>(null)
-  const [uploading, setUploading] = useState(false)
+  // File parsing
+  const [filename, setFilename]     = useState('')
+  const [fileType, setFileType]     = useState<'reservations' | 'expenses' | 'unknown' | null>(null)
+  const [validRows, setValidRows]   = useState<Record<string, any>[]>([])
+  const [invalidRows, setInvalidRows] = useState<InvalidRow[]>([])
+  const [parseStatus, setParseStatus] = useState('')
 
+  // Duplicate detection
+  const [readyRows, setReadyRows]           = useState<Record<string, any>[]>([])
+  const [duplicateCount, setDuplicateCount] = useState(0)
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
+  const [duplicatesChecked, setDuplicatesChecked]   = useState(false)
+  const [showInvalidDetail, setShowInvalidDetail]   = useState(false)
+
+  // Upload
+  const [uploading, setUploading]           = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadResult, setUploadResult]     = useState<{ imported: number; duplicatesSkipped: number; kind: string } | null>(null)
+  const [uploadError, setUploadError]       = useState<string | null>(null)
+
+  // History
+  const [uploadHistory, setUploadHistory] = useState<UploadHistoryRow[]>([])
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Data loading ─────────────────────────────────────────────────────────────
   async function loadProperties() {
     const [propertiesRes, clientsRes] = await Promise.all([
       supabase.from('properties').select('id, name').order('name'),
       supabase.from('clients').select('id').order('created_at', { ascending: true }).limit(1),
     ])
-
     const props = propertiesRes.data ?? []
     setProperties(props)
     if (props.length === 1) setSelectedPropertyId(props[0].id)
-    if (props.length > 1)  setSelectedPropertyId('')
-
     if (clientsRes.data?.length) setPrimaryClientId(clientsRes.data[0].id)
     setPropertiesLoading(false)
   }
 
-  useEffect(() => { loadProperties() }, [])
+  async function loadUploadHistory() {
+    try {
+      const { data } = await supabase
+        .from('uploads')
+        .select('id, upload_type, filename, row_count, uploaded_at, properties(name)')
+        .order('uploaded_at', { ascending: false })
+        .limit(5)
+      setUploadHistory((data as any as UploadHistoryRow[]) ?? [])
+    } catch {
+      setUploadHistory([])
+    }
+  }
 
+  useEffect(() => {
+    loadProperties()
+    loadUploadHistory()
+  }, [])
+
+  // ── Duplicate detection ───────────────────────────────────────────────────────
+  async function runCheckDuplicates(
+    rows: Record<string, any>[],
+    type: 'reservations' | 'expenses',
+    propId: string
+  ) {
+    if (!rows.length) {
+      setReadyRows([])
+      setDuplicateCount(0)
+      setDuplicatesChecked(true)
+      return
+    }
+
+    setCheckingDuplicates(true)
+    setDuplicatesChecked(false)
+
+    try {
+      if (type === 'reservations') {
+        const refs = rows.map(r => r.reservation_ref).filter(Boolean)
+        if (!refs.length) {
+          setReadyRows(rows)
+          setDuplicateCount(0)
+        } else {
+          const { data } = await supabase
+            .from('reservations')
+            .select('reservation_ref')
+            .eq('property_id', propId)
+            .in('reservation_ref', refs)
+
+          const existing = new Set((data ?? []).map((r: any) => r.reservation_ref))
+          const ready = rows.filter(r => !r.reservation_ref || !existing.has(r.reservation_ref))
+          setReadyRows(ready)
+          setDuplicateCount(rows.length - ready.length)
+        }
+      } else {
+        // expenses: fingerprint = paid_date|vendor|amount
+        const fps = rows.map(r => `${r.paid_date}|${r.vendor ?? ''}|${r.amount}`)
+        const { data } = await supabase
+          .from('expenses')
+          .select('paid_date, vendor, amount')
+          .eq('property_id', propId)
+
+        const existingFps = new Set(
+          (data ?? []).map((r: any) => `${r.paid_date}|${r.vendor ?? ''}|${r.amount}`)
+        )
+        const ready = rows.filter((_, i) => !existingFps.has(fps[i]))
+        setReadyRows(ready)
+        setDuplicateCount(rows.length - ready.length)
+      }
+    } catch {
+      // If check fails, fall back to allowing all rows
+      setReadyRows(rows)
+      setDuplicateCount(0)
+    }
+
+    setDuplicatesChecked(true)
+    setCheckingDuplicates(false)
+  }
+
+  // ── Property select handler ────────────────────────────────────────────────
+  function handlePropertySelect(propId: string) {
+    setSelectedPropertyId(propId)
+    if (propId && validRows.length > 0 && (fileType === 'reservations' || fileType === 'expenses')) {
+      runCheckDuplicates(validRows, fileType, propId)
+    } else if (!propId) {
+      setReadyRows(validRows)
+      setDuplicateCount(0)
+      setDuplicatesChecked(false)
+    }
+  }
+
+  // ── Property created handler ───────────────────────────────────────────────
   async function handlePropertyCreated(result?: { id: string; name: string }) {
     if (!result) return
     setShowCreateForm(false)
     const { data } = await supabase.from('properties').select('id, name').order('name')
-    const props = data ?? []
-    setProperties(props)
-    setSelectedPropertyId(result.id)
+    setProperties(data ?? [])
+    handlePropertySelect(result.id)
   }
 
+  // ── File parsing ──────────────────────────────────────────────────────────────
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setStatus('Reading file…')
-    setPreview([])
-    setParsedRows([])
-    setFileType(null)
+    // Reset file-related state
+    setParseStatus('Reading file…')
+    setValidRows([])
+    setInvalidRows([])
+    setReadyRows([])
+    setDuplicateCount(0)
+    setDuplicatesChecked(false)
+    setUploadResult(null)
+    setUploadError(null)
+    setShowInvalidDetail(false)
+    setFilename(file.name)
 
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: true,
+      skipEmptyLines: 'greedy',
       transformHeader: (header: string) =>
         Array.from(header)
           .filter(ch => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126)
@@ -99,57 +272,126 @@ export default function UploadPage() {
         setFileType(detected)
 
         if (detected === 'unknown') {
-          setStatus('Could not detect file type. Please upload a reservations or expenses CSV.')
+          setParseStatus('Could not detect file type. Please upload a reservations or expenses CSV.')
           return
         }
 
-        const rows = results.data as Record<string, string>[]
+        // Drop rows where every value is empty/whitespace — Excel trailing comma rows
+        const rows = (results.data as Record<string, string>[]).filter(row =>
+          Object.values(row).some(v => v != null && String(v).trim() !== '')
+        )
+        let valid: Record<string, any>[]
+        let invalid: InvalidRow[]
 
         if (detected === 'reservations') {
-          const mapped = rows
-            .map(row => mapRow(row, mapColumns(headers)))
-            .filter(row => row.check_in && row.check_out)
-          setParsedRows(mapped)
-          setPreview(mapped.slice(0, 5))
-          setStatus(`Detected: Reservation file. Ready to import ${mapped.length} reservations.`)
+          const mapped = rows.map(row => mapRow(row, mapColumns(headers)))
+          valid = mapped.filter(r => r.check_in && r.check_out)
+          invalid = mapped
+            .map((r, i) => ({ r, i }))
+            .filter(({ r }) => !r.check_in || !r.check_out)
+            .map(({ r, i }) => ({
+              index: i,
+              reason: (r._errors as string[] | undefined)?.join('; ')
+                ?? (!r.check_in ? 'Missing or invalid check-in date' : 'Missing or invalid check-out date'),
+            }))
         } else {
-          const mapped = rows
-            .map(row => mapExpenseRow(row, mapExpenseColumns(headers)))
-            .filter(row => row.paid_date && row.amount)
-          setParsedRows(mapped)
-          setPreview(mapped.slice(0, 5))
-          setStatus(`Detected: Expense file. Ready to import ${mapped.length} expenses.`)
+          const mapped = rows.map(row => mapExpenseRow(row, mapExpenseColumns(headers)))
+          valid = mapped.filter(r => r.paid_date && r.amount)
+          invalid = mapped
+            .map((r, i) => ({ r, i }))
+            .filter(({ r }) => !r.paid_date || !r.amount)
+            .map(({ r, i }) => ({
+              index: i,
+              reason: (r._errors as string[] | undefined)?.join('; ')
+                ?? (!r.paid_date ? 'Missing or invalid date' : 'Missing amount'),
+            }))
+        }
+
+        setValidRows(valid)
+        setInvalidRows(invalid)
+        setParseStatus('')
+
+        if (selectedPropertyId && (detected === 'reservations' || detected === 'expenses')) {
+          runCheckDuplicates(valid, detected, selectedPropertyId)
+        } else {
+          setReadyRows(valid)
+          setDuplicateCount(0)
+          setDuplicatesChecked(false)
         }
       },
-      error: (err) => setStatus(`Error reading file: ${err.message}`),
+      error: (err: any) => setParseStatus(`Error reading file: ${err.message}`),
     })
   }
 
+  // ── Upload ────────────────────────────────────────────────────────────────────
   async function handleUpload() {
-    if (!parsedRows.length || !fileType || !selectedPropertyId) return
+    if (!readyRows.length || !fileType || !selectedPropertyId) return
     setUploading(true)
-    setStatus('Uploading…')
+    setUploadProgress(0)
+    setUploadError(null)
 
-    const rows = parsedRows.map(row => ({ ...row, property_id: selectedPropertyId }))
     const table = fileType === 'reservations' ? 'reservations' : 'expenses'
-    const { error } = await supabase.from(table).insert(rows)
 
-    if (error) {
-      setStatus(`Upload failed: ${error.message}`)
-    } else {
-      setStatus(`Successfully imported ${rows.length} ${fileType}!`)
-      setPreview([])
-      setParsedRows([])
+    try {
+      // Strip internal fields, add property_id
+      const withId = readyRows.map(r => {
+        const clean: Record<string, any> = {}
+        for (const [k, v] of Object.entries(r)) {
+          if (!k.startsWith('_')) clean[k] = v
+        }
+        return { ...clean, property_id: selectedPropertyId }
+      })
+
+      let imported = 0
+      for (let i = 0; i < withId.length; i += BATCH_SIZE) {
+        const batch = withId.slice(i, i + BATCH_SIZE)
+        const { error } = await supabase.from(table).insert(batch)
+        if (error) throw new Error(friendlyError(error.message))
+        imported += batch.length
+        if (withId.length > 100) {
+          setUploadProgress(Math.round((imported / withId.length) * 100))
+        }
+      }
+
+      // Track upload history (best-effort — don't block success)
+      supabase.from('uploads').insert({
+        property_id: selectedPropertyId,
+        upload_type: fileType,
+        filename: filename || null,
+        row_count: imported,
+      }).then(() => loadUploadHistory())
+
+      setUploadResult({
+        imported,
+        duplicatesSkipped: duplicateCount,
+        kind: fileType === 'expenses' ? 'expense' : 'reservation',
+      })
+
+      // Reset file state so they can import another file
+      setValidRows([])
+      setReadyRows([])
+      setInvalidRows([])
+      setDuplicateCount(0)
+      setDuplicatesChecked(false)
       setFileType(null)
+      setFilename('')
+      setParseStatus('')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } catch (err: any) {
+      setUploadError(err.message ?? 'Upload failed. Please try again.')
     }
+
     setUploading(false)
+    setUploadProgress(0)
   }
 
-  const isError   = status.includes('failed') || status.includes('Could not')
-  const isSuccess = status.includes('Successfully')
-  const selectedProperty = properties.find(p => p.id === selectedPropertyId)
+  // ── Derived values ────────────────────────────────────────────────────────────
+  const selectedProperty   = properties.find(p => p.id === selectedPropertyId)
+  const preview            = readyRows.slice(0, 5)
+  const hasFileLoaded      = validRows.length > 0 || invalidRows.length > 0
+  const isError            = parseStatus.includes('failed') || parseStatus.includes('Could not') || parseStatus.includes('Error')
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────────
   if (propertiesLoading) {
     return (
       <main style={{ padding: '40px', maxWidth: '900px', fontFamily: 'Raleway, sans-serif' }}>
@@ -160,46 +402,25 @@ export default function UploadPage() {
     )
   }
 
-  // ── Zero properties ──────────────────────────────────────────────────────────
+  // ── Zero properties ───────────────────────────────────────────────────────────
   if (properties.length === 0) {
     return (
       <main style={{ padding: '40px', maxWidth: '560px', fontFamily: 'Raleway, sans-serif' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
-          Import Data
-        </h1>
+        <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>Import Data</h1>
         <p style={{ color: '#888', fontSize: '14px', marginBottom: '32px' }}>
           Upload your CSV export from Airbnb, VRBO, or your property manager.
         </p>
-
-        <div style={{
-          background: '#fff',
-          border: '1px solid #eee',
-          borderRadius: '12px',
-          padding: '48px 32px',
-          textAlign: 'center',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        }}>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 32px' }}>
           <div style={{ fontSize: '40px', marginBottom: '16px' }}>🏠</div>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0D2C54', marginBottom: '8px' }}>
-            No properties yet
-          </h2>
-          <p style={{ color: '#888', fontSize: '14px', lineHeight: '1.6', marginBottom: '28px', maxWidth: '300px', margin: '0 auto 28px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0D2C54', marginBottom: '8px' }}>No properties yet</h2>
+          <p style={{ color: '#888', fontSize: '14px', lineHeight: '1.6', maxWidth: '300px', margin: '0 auto 28px' }}>
             Create your first property before importing data.
           </p>
-          <Link
-            href="/properties"
-            style={{
-              display: 'inline-block',
-              background: '#FF7767',
-              color: '#fff',
-              textDecoration: 'none',
-              padding: '12px 28px',
-              borderRadius: '8px',
-              fontSize: '15px',
-              fontWeight: '700',
-              fontFamily: 'Raleway, sans-serif',
-            }}
-          >
+          <Link href="/properties" style={{
+            display: 'inline-block', background: '#FF7767', color: '#fff',
+            textDecoration: 'none', padding: '12px 28px', borderRadius: '8px',
+            fontSize: '15px', fontWeight: '700', fontFamily: 'Raleway, sans-serif',
+          }}>
             Go to Properties
           </Link>
         </div>
@@ -207,64 +428,44 @@ export default function UploadPage() {
     )
   }
 
-  // ── Normal upload UI (one or more properties) ────────────────────────────────
+  // ── Normal upload UI ──────────────────────────────────────────────────────────
   return (
     <main style={{ padding: '40px', maxWidth: '900px', fontFamily: 'Raleway, sans-serif' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
-        Import Data
-      </h1>
+      <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>Import Data</h1>
       <p style={{ color: '#666', fontSize: '14px', marginBottom: '32px' }}>
         Upload your CSV export from Airbnb, VRBO, or your property manager.
         We'll automatically detect whether it's a reservation or expense file.
       </p>
 
       {/* ── Property selector ──────────────────────────────────────────────── */}
-      <div style={{
-        background: '#fff',
-        border: '1px solid #eee',
-        borderRadius: '12px',
-        padding: '20px 24px',
-        marginBottom: '28px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      }}>
+      <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={labelStyle}>Property</div>
             {properties.length === 1 ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '15px', fontWeight: '600', color: '#0D2C54' }}>
-                  {properties[0].name}
-                </span>
+                <span style={{ fontSize: '15px', fontWeight: '600', color: '#0D2C54' }}>{properties[0].name}</span>
                 <span style={{ fontSize: '12px', color: '#aaa' }}>— uploading to this property</span>
               </div>
             ) : (
               <select
                 value={selectedPropertyId}
-                onChange={e => setSelectedPropertyId(e.target.value)}
+                onChange={e => handlePropertySelect(e.target.value)}
                 style={{ ...inputStyle, width: 'auto', minWidth: '260px', cursor: 'pointer' }}
               >
                 <option value="">Select a property…</option>
-                {properties.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             )}
           </div>
-
           {!showCreateForm && (
             <button
               onClick={() => setShowCreateForm(true)}
               style={{
-                background: 'none',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '8px 16px',
-                fontSize: '13px',
-                color: '#666',
-                fontFamily: 'Raleway, sans-serif',
-                fontWeight: '500',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
+                background: 'none', border: '1px solid #ddd', borderRadius: '8px',
+                padding: '8px 16px', fontSize: '13px', color: '#666',
+                fontFamily: 'Raleway, sans-serif', fontWeight: '500',
+                cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
               + Add property
@@ -273,9 +474,9 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Inline create form (rendered below selector, not inside it) */}
+      {/* ── Inline create form ─────────────────────────────────────────────── */}
       {showCreateForm && (
-        <div style={{ marginBottom: '28px' }}>
+        <div style={{ marginBottom: '24px' }}>
           <PropertyForm
             mode="create"
             primaryClientId={primaryClientId}
@@ -286,7 +487,8 @@ export default function UploadPage() {
       )}
 
       {/* ── File input ─────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ ...cardStyle, marginBottom: '24px' }}>
+        <div style={labelStyle}>CSV File</div>
         {selectedProperty && (
           <p style={{ fontSize: '13px', color: '#888', marginBottom: '10px' }}>
             Uploading to: <strong style={{ color: '#0D2C54' }}>{selectedProperty.name}</strong>
@@ -298,95 +500,295 @@ export default function UploadPage() {
           </p>
         )}
         <input
+          ref={fileInputRef}
           type="file"
           accept=".csv"
           onChange={handleFile}
-          disabled={!selectedPropertyId}
-          style={{ display: 'block', cursor: selectedPropertyId ? 'pointer' : 'not-allowed' }}
+          disabled={uploading}
+          style={{ display: 'block', cursor: uploading ? 'not-allowed' : 'pointer' }}
         />
+        {parseStatus && (
+          <p style={{
+            marginTop: '12px', fontSize: '13px',
+            color: isError ? '#B83224' : '#888',
+          }}>
+            {parseStatus}
+          </p>
+        )}
       </div>
 
-      {/* ── Status message ─────────────────────────────────────────────────── */}
-      {status && (
-        <p style={{
-          padding: '12px 16px',
-          background: isError ? '#fff0f0' : isSuccess ? '#f0fff4' : '#f0f4ff',
-          border: `1px solid ${isError ? '#ffcccc' : isSuccess ? '#c3e6cb' : '#c3d0f5'}`,
-          borderRadius: '8px',
-          marginBottom: '24px',
-          fontSize: '14px',
-          color: isError ? '#cc0000' : isSuccess ? '#2d6a4f' : '#2d3a8c',
-        }}>
-          {status}
-        </p>
+      {/* ── Summary panel ──────────────────────────────────────────────────── */}
+      {hasFileLoaded && (
+        <div style={{ ...cardStyle, borderColor: '#e8edf3' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h3 style={{
+              fontSize: '12px', fontWeight: '700', color: '#0D2C54', margin: 0,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+            }}>
+              Import Summary
+              {fileType && fileType !== 'unknown' && (
+                <span style={{ marginLeft: '8px', fontWeight: '400', color: '#aaa', textTransform: 'none', letterSpacing: 0 }}>
+                  — {fileType === 'reservations' ? 'Reservations' : 'Expenses'} file
+                </span>
+              )}
+            </h3>
+            {checkingDuplicates && (
+              <span style={{ fontSize: '12px', color: '#aaa' }}>Checking for duplicates…</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* ── State: duplicate check complete ── */}
+            {!checkingDuplicates && duplicatesChecked && (() => {
+              const allDupes = readyRows.length === 0 && duplicateCount > 0
+              const mixed    = readyRows.length > 0 && duplicateCount > 0
+              const allNew   = readyRows.length > 0 && duplicateCount === 0
+
+              if (allDupes) return (
+                <div style={{ fontSize: '14px', color: '#888' }}>
+                  This file has already been imported. All {duplicateCount.toLocaleString()} rows are already in your data.
+                </div>
+              )
+              if (mixed) return (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#1A6E47' }}>
+                    <span>✓</span>
+                    <strong>{readyRows.length.toLocaleString()} new {readyRows.length === 1 ? 'row' : 'rows'} ready to import</strong>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#aaa', marginTop: '4px', marginLeft: '20px' }}>
+                    ({duplicateCount.toLocaleString()} already {duplicateCount === 1 ? 'exists' : 'exist'} and will be skipped)
+                  </div>
+                </div>
+              )
+              if (allNew) return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#1A6E47' }}>
+                  <span>✓</span>
+                  <strong>{readyRows.length.toLocaleString()} {readyRows.length === 1 ? 'row' : 'rows'} ready to import</strong>
+                </div>
+              )
+              return null
+            })()}
+
+            {/* ── State: not yet checked (no property selected) ── */}
+            {!duplicatesChecked && !checkingDuplicates && validRows.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#1A6E47' }}>
+                <span>✓</span>
+                <span>
+                  <strong>{validRows.length.toLocaleString()}</strong> {validRows.length === 1 ? 'row' : 'rows'} parsed
+                </span>
+                {!selectedPropertyId && (
+                  <span style={{ fontSize: '12px', color: '#aaa', marginLeft: '4px' }}>
+                    — select a property to check for duplicates
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Invalid rows */}
+            {invalidRows.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowInvalidDetail(v => !v)}
+                  style={{
+                    fontSize: '14px', color: '#B83224', background: 'none', border: 'none',
+                    cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '6px',
+                    fontFamily: 'Raleway, sans-serif',
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>✗</span>
+                  <span>
+                    <strong>{invalidRows.length.toLocaleString()}</strong> {invalidRows.length === 1 ? 'row' : 'rows'} with invalid data
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#aaa' }}>{showInvalidDetail ? '▲' : '▼'}</span>
+                </button>
+                {showInvalidDetail && (
+                  <div style={{
+                    marginTop: '8px', marginLeft: '24px',
+                    paddingLeft: '12px', borderLeft: '2px solid #FFCDC7',
+                  }}>
+                    {invalidRows.slice(0, 8).map((r, i) => (
+                      <div key={i} style={{ fontSize: '12px', color: '#888', marginBottom: '3px' }}>
+                        Row {r.index + 1}: {r.reason}
+                      </div>
+                    ))}
+                    {invalidRows.length > 8 && (
+                      <div style={{ fontSize: '12px', color: '#aaa' }}>
+                        …and {invalidRows.length - 8} more
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* ── Preview table + import button ───────────────────────────────────── */}
+      {/* ── Preview table ───────────────────────────────────────────────────── */}
       {preview.length > 0 && (
         <>
-          <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#0D2C54', marginBottom: '12px' }}>
-            Preview <span style={{ fontWeight: '400', color: '#aaa', fontSize: '14px' }}>(first 5 rows)</span>
+          <h2 style={{ fontSize: '15px', fontWeight: '700', color: '#0D2C54', marginBottom: '12px' }}>
+            Preview{' '}
+            <span style={{ fontWeight: '400', color: '#aaa', fontSize: '13px' }}>(first 5 rows)</span>
           </h2>
           <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
             <table style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: '13px',
-              border: '1px solid #e0e0e0',
-              background: '#fff',
-              borderRadius: '8px',
-              overflow: 'hidden',
+              width: '100%', borderCollapse: 'collapse', fontSize: '12px',
+              border: '1px solid #eee', background: '#fff', borderRadius: '8px', overflow: 'hidden',
             }}>
               <thead>
-                <tr style={{ background: '#f5f7fa' }}>
-                  {Object.keys(preview[0]).map(key => (
-                    <th key={key} style={{
-                      padding: '9px 12px',
-                      textAlign: 'left',
-                      borderBottom: '1px solid #e0e0e0',
-                      whiteSpace: 'nowrap',
-                      fontWeight: '600',
-                      color: '#0D2C54',
-                      fontSize: '12px',
-                    }}>
-                      {key}
-                    </th>
-                  ))}
+                <tr>
+                  {Object.keys(preview[0])
+                    .filter(k => !k.startsWith('_'))
+                    .map(key => <th key={key} style={thStyle}>{key}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {preview.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    {Object.values(row).map((val: any, j) => (
-                      <td key={j} style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: '#444' }}>
-                        {val ?? '—'}
-                      </td>
-                    ))}
+                  <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                    {Object.entries(row)
+                      .filter(([k]) => !k.startsWith('_'))
+                      .map(([k, val]) => (
+                        <td key={k} style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                          {val != null && val !== '' ? String(val) : <span style={{ color: '#ccc' }}>—</span>}
+                        </td>
+                      ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </>
+      )}
 
+      {/* ── Progress bar ────────────────────────────────────────────────────── */}
+      {uploading && readyRows.length > 100 && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <span style={{ fontSize: '13px', color: '#666' }}>Importing…</span>
+            <span style={{ fontSize: '13px', color: '#666' }}>{uploadProgress}%</span>
+          </div>
+          <div style={{ height: '6px', background: '#f0f0f0', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${uploadProgress}%`,
+              background: '#FF7767', borderRadius: '3px',
+              transition: 'width 0.25s ease',
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Import button ────────────────────────────────────────────────────── */}
+      {hasFileLoaded && selectedPropertyId && !checkingDuplicates && (
+        duplicatesChecked && readyRows.length === 0 && duplicateCount > 0 ? (
+          // All rows already exist — show disabled "Already imported"
+          <button disabled style={{
+            background: '#f0f0f0', color: '#aaa', border: 'none', padding: '12px 32px',
+            borderRadius: '8px', fontSize: '15px', fontFamily: 'Raleway, sans-serif',
+            fontWeight: '700', marginBottom: '24px', cursor: 'not-allowed',
+          }}>
+            Already imported
+          </button>
+        ) : (
+          // Has rows to import (or duplicate check not done yet)
           <button
             onClick={handleUpload}
-            disabled={uploading || !selectedPropertyId}
+            disabled={uploading || readyRows.length === 0}
             style={{
-              background: uploading || !selectedPropertyId ? '#faa99f' : '#FF7767',
-              color: '#fff',
-              border: 'none',
-              padding: '12px 32px',
-              borderRadius: '8px',
-              fontSize: '15px',
-              fontFamily: 'Raleway, sans-serif',
-              fontWeight: '700',
-              cursor: uploading || !selectedPropertyId ? 'not-allowed' : 'pointer',
+              background: (uploading || readyRows.length === 0) ? '#faa99f' : '#FF7767',
+              color: '#fff', border: 'none', padding: '12px 32px',
+              borderRadius: '8px', fontSize: '15px', fontFamily: 'Raleway, sans-serif',
+              fontWeight: '700', marginBottom: '24px',
+              cursor: (uploading || readyRows.length === 0) ? 'not-allowed' : 'pointer',
               transition: 'background 0.15s ease',
             }}
           >
-            {uploading ? 'Importing…' : `Import ${parsedRows.length} ${fileType}`}
+            {uploading
+              ? (readyRows.length > 100 ? 'Importing…' : `Importing ${plural(readyRows.length, 'row')}…`)
+              : `Import ${plural(readyRows.length || validRows.length, fileType === 'expenses' ? 'expense' : 'reservation')}`}
           </button>
-        </>
+        )
+      )}
+
+      {/* ── Upload error ─────────────────────────────────────────────────────── */}
+      {uploadError && (
+        <div style={{
+          padding: '12px 16px', background: '#FFF0EE', border: '1px solid #FFCDC7',
+          borderRadius: '8px', marginBottom: '24px', fontSize: '14px', color: '#B83224',
+        }}>
+          {uploadError}
+        </div>
+      )}
+
+      {/* ── Upload result ───────────────────────────────────────────────────── */}
+      {uploadResult && (
+        <div style={{
+          padding: '14px 18px', background: '#F0FFF8', border: '1px solid #A8E6C3',
+          borderRadius: '8px', marginBottom: '32px', fontSize: '14px', color: '#1A6E47',
+        }}>
+          <strong>
+            {plural(uploadResult.imported, `new ${uploadResult.kind}`)} imported.
+          </strong>
+          {uploadResult.duplicatesSkipped > 0 && (
+            <span style={{ color: '#888', marginLeft: '8px', fontSize: '13px' }}>
+              ({uploadResult.duplicatesSkipped.toLocaleString()} already {uploadResult.duplicatesSkipped === 1 ? 'existed' : 'existed'} and {uploadResult.duplicatesSkipped === 1 ? 'was' : 'were'} skipped)
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Upload history ───────────────────────────────────────────────────── */}
+      {uploadHistory.length > 0 && (
+        <div style={{ marginTop: '40px' }}>
+          <h2 style={{
+            fontSize: '13px', fontWeight: '700', color: '#0D2C54',
+            marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em',
+          }}>
+            Recent Uploads
+          </h2>
+          <div style={{
+            background: '#fff', border: '1px solid #eee',
+            borderRadius: '12px', overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Date', 'Type', 'Property', 'File', 'Rows'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {uploadHistory.map((h, i) => (
+                  <tr key={h.id} style={{ borderBottom: i < uploadHistory.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                    <td style={tdStyle}>
+                      {new Date(h.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{
+                        background: h.upload_type === 'reservations' ? '#EBF4FF' : '#FFF4E5',
+                        color: h.upload_type === 'reservations' ? '#1A5CA8' : '#A85C1A',
+                        padding: '2px 9px', borderRadius: '12px',
+                        fontSize: '11px', fontWeight: '600',
+                      }}>
+                        {h.upload_type === 'reservations' ? 'Reservations' : 'Expenses'}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>{h.properties?.name ?? '—'}</td>
+                    <td style={{ ...tdStyle, color: '#888', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {h.filename ?? '—'}
+                    </td>
+                    <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>
+                      {h.row_count.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </main>
   )
