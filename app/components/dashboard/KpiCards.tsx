@@ -2,6 +2,20 @@
 
 import { useState } from 'react'
 
+export interface PriorKpis {
+  totalIncome: number
+  totalExpenses: number
+  noi: number
+  oer: number
+  adr: number
+  occupancyRate: number
+  totalBookings: number
+  performanceNights: number
+  avgNightsPerBooking: number
+  avgGuestsPerBooking: number
+  avgLeadTime: number
+}
+
 interface Props {
   totalIncome: number
   totalExpenses: number
@@ -14,6 +28,8 @@ interface Props {
   avgNightsPerBooking: number
   avgGuestsPerBooking: number
   avgLeadTime: number
+  priorKpis?: PriorKpis | null
+  vsLabel?: string | null
 }
 
 function formatCurrency(value: number): string {
@@ -30,6 +46,37 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
+// ── Comparison helpers ────────────────────────────────────────────────────────
+const GOOD  = '#4CAF82'
+const BAD   = '#FF7767'
+const MUTED = '#aaa'
+
+type ChangeDir = 'up_good' | 'down_good' | 'neutral'
+
+function kpiChange(
+  current: number,
+  prior: number,
+  dir: ChangeDir,
+  vsLabel: string
+): { text: string; color: string } {
+  if (prior === 0 && current === 0) return { text: '—', color: MUTED }
+
+  if (prior === 0) {
+    const color = dir === 'neutral' ? MUTED : dir === 'up_good' ? GOOD : BAD
+    return { text: `↑ New ${vsLabel}`, color }
+  }
+
+  const pct = Math.round(((current - prior) / prior) * 100)
+
+  if (pct === 0) return { text: `— ${vsLabel}`, color: MUTED }
+
+  const up    = pct > 0
+  const arrow = up ? '↑' : '↓'
+  const isGood: boolean | null = dir === 'neutral' ? null : dir === 'up_good' ? up : !up
+  const color = isGood === null ? MUTED : isGood ? GOOD : BAD
+  return { text: `${arrow} ${Math.abs(pct)}% ${vsLabel}`, color }
+}
+
 export default function KpiCards({
   totalIncome,
   totalExpenses,
@@ -42,21 +89,81 @@ export default function KpiCards({
   avgNightsPerBooking,
   avgGuestsPerBooking,
   avgLeadTime,
+  priorKpis,
+  vsLabel,
 }: Props) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
+  const p  = priorKpis ?? null
+  const vs = vsLabel ?? ''
+
   const kpis = [
-    { label: 'Total Income', value: formatCurrency(totalIncome), color: '#0D2C54' },
-    { label: 'Total Expenses', value: formatCurrency(totalExpenses), color: '#FF7767' },
-    { label: 'NOI', value: formatCurrency(noi), color: noi >= 0 ? '#0D2C54' : '#FF7767' },
-    { label: 'OER', value: formatPercent(oer), color: '#FF7767' },
-    { label: 'Average Daily Rate', value: `$${adr.toFixed(0)}`, color: '#0D2C54' },
-    { label: 'Occupancy Rate', value: formatPercent(occupancyRate), color: occupancyRate >= 50 ? '#0D2C54' : '#FF7767' },
-    { label: 'Total Bookings', value: totalBookings.toString(), color: '#0D2C54' },
-    { label: 'Total Nights', value: performanceNights.toString(), color: '#0D2C54' },
-    { label: 'Avg Nights per Booking', value: avgNightsPerBooking.toFixed(1), color: '#0D2C54' },
-    { label: 'Avg Guests per Booking', value: avgGuestsPerBooking.toFixed(1), color: '#0D2C54' },
-    { label: 'Avg Days Booked Ahead', value: `${Math.round(avgLeadTime)} days`, color: '#0D2C54' },
+    {
+      label: 'Total Income',
+      value: formatCurrency(totalIncome),
+      color: '#0D2C54',
+      change: p ? kpiChange(totalIncome, p.totalIncome, 'up_good', vs) : null,
+    },
+    {
+      label: 'Total Expenses',
+      value: formatCurrency(totalExpenses),
+      color: '#FF7767',
+      change: p ? kpiChange(totalExpenses, p.totalExpenses, 'down_good', vs) : null,
+    },
+    {
+      label: 'NOI',
+      value: formatCurrency(noi),
+      color: noi >= 0 ? '#0D2C54' : '#FF7767',
+      change: p ? kpiChange(noi, p.noi, 'up_good', vs) : null,
+    },
+    {
+      label: 'OER',
+      value: formatPercent(oer),
+      color: '#FF7767',
+      change: p ? kpiChange(oer, p.oer, 'down_good', vs) : null,
+    },
+    {
+      label: 'Average Daily Rate',
+      value: `$${adr.toFixed(0)}`,
+      color: '#0D2C54',
+      change: p ? kpiChange(adr, p.adr, 'up_good', vs) : null,
+    },
+    {
+      label: 'Occupancy Rate',
+      value: formatPercent(occupancyRate),
+      color: occupancyRate >= 50 ? '#0D2C54' : '#FF7767',
+      change: p ? kpiChange(occupancyRate, p.occupancyRate, 'up_good', vs) : null,
+    },
+    {
+      label: 'Total Bookings',
+      value: totalBookings.toString(),
+      color: '#0D2C54',
+      change: p ? kpiChange(totalBookings, p.totalBookings, 'up_good', vs) : null,
+    },
+    {
+      label: 'Total Nights',
+      value: performanceNights.toString(),
+      color: '#0D2C54',
+      change: p ? kpiChange(performanceNights, p.performanceNights, 'up_good', vs) : null,
+    },
+    {
+      label: 'Avg Nights per Booking',
+      value: avgNightsPerBooking.toFixed(1),
+      color: '#0D2C54',
+      change: p ? kpiChange(avgNightsPerBooking, p.avgNightsPerBooking, 'up_good', vs) : null,
+    },
+    {
+      label: 'Avg Guests per Booking',
+      value: avgGuestsPerBooking.toFixed(1),
+      color: '#0D2C54',
+      change: p ? kpiChange(avgGuestsPerBooking, p.avgGuestsPerBooking, 'neutral', vs) : null,
+    },
+    {
+      label: 'Avg Days Booked Ahead',
+      value: `${Math.round(avgLeadTime)} days`,
+      color: '#0D2C54',
+      change: p ? kpiChange(avgLeadTime, p.avgLeadTime, 'neutral', vs) : null,
+    },
   ]
 
   return (
@@ -103,6 +210,17 @@ export default function KpiCards({
             }}>
               {kpi.value}
             </div>
+            {kpi.change && (
+              <div style={{
+                fontSize: '11px',
+                fontWeight: '600',
+                color: kpi.change.color,
+                marginTop: '6px',
+                lineHeight: 1.3,
+              }}>
+                {kpi.change.text}
+              </div>
+            )}
           </div>
         )
       })}
