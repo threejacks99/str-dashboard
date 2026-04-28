@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -29,24 +30,14 @@ export default function Sidebar() {
         padding: '28px 24px 24px',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
       }}>
-        <div style={{
-          fontSize: '22px',
-          fontWeight: '800',
-          color: '#FF7767',
-          letterSpacing: '-0.5px',
-          fontFamily: 'Raleway, sans-serif',
-        }}>
-          HOSTICS
-        </div>
-        <div style={{
-          fontSize: '10px',
-          color: 'rgba(255,255,255,0.5)',
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase',
-          marginTop: '2px',
-        }}>
-          STR Analytics
-        </div>
+        <Image
+          src="/hostics-logo-coral-white.svg"
+          alt="Hostics — STR Analytics"
+          width={140}
+          height={40}
+          style={{ height: 'auto' }}
+          priority
+        />
       </div>
 
       {/* Navigation */}

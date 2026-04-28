@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
@@ -109,23 +110,14 @@ export default function LoginPage() {
       }}>
         {/* Wordmark */}
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{
-            fontSize: '30px',
-            fontWeight: '800',
-            color: '#FF7767',
-            letterSpacing: '-0.5px',
-          }}>
-            HOSTICS
-          </div>
-          <div style={{
-            fontSize: '11px',
-            color: '#aaa',
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            marginTop: '4px',
-          }}>
-            STR Analytics
-          </div>
+          <Image
+            src="/hostics-logo-coral-navy.svg"
+            alt="Hostics — STR Analytics"
+            width={200}
+            height={56}
+            style={{ height: 'auto' }}
+            priority
+          />
         </div>
 
         <h2 style={{

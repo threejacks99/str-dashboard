@@ -5,7 +5,8 @@
       "Bash(node -e \"require\\('@supabase/ssr'\\)\")",
       "Bash(npx tsc *)",
       "Bash(node *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }

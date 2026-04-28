@@ -5,6 +5,9 @@ import AppShell from './components/AppShell'
 export const metadata: Metadata = {
   title: 'Hostics | STR Analytics',
   description: 'Short term rental analytics dashboard',
+  icons: {
+    icon: '/favicon-coral.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

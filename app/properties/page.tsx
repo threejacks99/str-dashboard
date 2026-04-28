@@ -95,7 +95,6 @@ export default function PropertiesPage() {
 
   async function handleCreated(result?: { id: string; name: string }) {
     if (!result) return
-    // Re-fetch the full property so we get address, beds/baths, and geocoded_at
     const { data } = await supabase
       .from('properties')
       .select('id, name, address, bedrooms, bathrooms, geocoded_at')
