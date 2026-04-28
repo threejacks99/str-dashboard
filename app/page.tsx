@@ -3,7 +3,6 @@ import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientId
 import KpiCards from './components/dashboard/KpiCards'
 import type { PriorKpis } from './components/dashboard/KpiCards'
 import RevenueChart from './components/dashboard/RevenueChart'
-import ExpensesChart from './components/dashboard/ExpensesChart'
 import BookingSourceChart from './components/dashboard/BookingSourceChart'
 import DayOfWeekChart from './components/dashboard/DayOfWeekChart'
 
@@ -252,17 +251,6 @@ export default async function DashboardPage({
       return { month: label, revenue: Math.round(revenue), nights, netAdr: nights > 0 ? Math.round(revenue / nights) : 0 }
     })
 
-  // ── Expenses by category chart data ───────────────────────────────────────
-  const allExpenses = expenses ?? []
-  const expenseCategoryMap: Record<string, number> = {}
-  for (const e of allExpenses) {
-    const cat = e.category?.trim() || 'Uncategorized'
-    expenseCategoryMap[cat] = (expenseCategoryMap[cat] || 0) + (e.amount || 0)
-  }
-  const expensesByCategory = Object.entries(expenseCategoryMap)
-    .map(([category, amount]) => ({ category, amount: Math.round(amount) }))
-    .sort((a, b) => b.amount - a.amount)
-
   // ── Booking source chart data ──────────────────────────────────────────────
   const sourceCountMap: Record<string, number> = {}
   for (const r of performanceReservations) {
@@ -314,8 +302,6 @@ export default async function DashboardPage({
       />
 
       <RevenueChart data={monthlyRevenue} />
-
-      <ExpensesChart data={expensesByCategory} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
         <BookingSourceChart data={bookingsBySource} />

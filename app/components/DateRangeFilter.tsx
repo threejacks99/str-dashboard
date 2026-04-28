@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 // ── Presets ───────────────────────────────────────────────────────────────────
 export const PRESETS = [
@@ -23,6 +23,7 @@ function formatDateLabel(dateStr: string): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function DateRangeFilter() {
   const router      = useRouter()
+  const pathname    = usePathname()
   const searchParams = useSearchParams()
   const dropRef     = useRef<HTMLDivElement>(null)
 
@@ -59,7 +60,7 @@ export default function DateRangeFilter() {
     p.set('preset', id)
     p.delete('from')
     p.delete('to')
-    router.push(`/?${p.toString()}`)
+    router.push(`${pathname}?${p.toString()}`)
     setOpen(false)
     setCustomMode(false)
   }
@@ -76,7 +77,7 @@ export default function DateRangeFilter() {
     p.set('preset', 'custom')
     p.set('from', inputFrom)
     p.set('to', inputTo)
-    router.push(`/?${p.toString()}`)
+    router.push(`${pathname}?${p.toString()}`)
     setOpen(false)
     setCustomMode(false)
   }
