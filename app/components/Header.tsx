@@ -57,7 +57,7 @@ export default function Header() {
     }}>
       {/* Left: date range filter (dashboard only) */}
       <div>
-        {(pathname === '/' || pathname === '/financials') && (
+        {['/', '/financials', '/bookings'].includes(pathname) && (
           <Suspense fallback={null}>
             <DateRangeFilter />
           </Suspense>

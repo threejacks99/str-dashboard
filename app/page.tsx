@@ -3,8 +3,6 @@ import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientId
 import KpiCards from './components/dashboard/KpiCards'
 import type { PriorKpis } from './components/dashboard/KpiCards'
 import RevenueChart from './components/dashboard/RevenueChart'
-import BookingSourceChart from './components/dashboard/BookingSourceChart'
-import DayOfWeekChart from './components/dashboard/DayOfWeekChart'
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 function toStr(d: Date): string {
@@ -251,31 +249,6 @@ export default async function DashboardPage({
       return { month: label, revenue: Math.round(revenue), nights, netAdr: nights > 0 ? Math.round(revenue / nights) : 0 }
     })
 
-  // ── Booking source chart data ──────────────────────────────────────────────
-  const sourceCountMap: Record<string, number> = {}
-  for (const r of performanceReservations) {
-    const source = r.booking_source?.trim() || 'Unknown'
-    sourceCountMap[source] = (sourceCountMap[source] || 0) + 1
-  }
-  const totalSourceCount = Object.values(sourceCountMap).reduce((s, n) => s + n, 0)
-  const bookingsBySource = Object.entries(sourceCountMap)
-    .map(([source, count]) => ({
-      source,
-      count,
-      percentage: totalSourceCount > 0 ? (count / totalSourceCount) * 100 : 0,
-    }))
-    .sort((a, b) => b.count - a.count)
-
-  // ── Day of week chart data ─────────────────────────────────────────────────
-  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const dayCountMap: Record<string, number> = Object.fromEntries(DAYS.map(d => [d, 0]))
-  for (const r of performanceReservations) {
-    const date = new Date(r.check_in)
-    if (isNaN(date.getTime())) continue
-    dayCountMap[DAYS[(date.getDay() + 6) % 7]]++
-  }
-  const bookingsByDay = DAYS.map(day => ({ day: day.slice(0, 3), count: dayCountMap[day] }))
-
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
@@ -302,11 +275,6 @@ export default async function DashboardPage({
       />
 
       <RevenueChart data={monthlyRevenue} />
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
-        <BookingSourceChart data={bookingsBySource} />
-        <DayOfWeekChart data={bookingsByDay} />
-      </div>
     </div>
   )
 }
