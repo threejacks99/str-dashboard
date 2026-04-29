@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Tooltip from '../Tooltip'
+import { METRIC_DEFS } from '../../../lib/metricDefinitions'
 
 export interface Reservation {
   id: string
@@ -231,10 +233,16 @@ export default function ReservationsTable({ reservations }: Props) {
                 Source<SortIcon col="booking_source" />
               </th>
               <th style={{ ...thBase, textAlign: 'right' }} onClick={() => handleSort('gross_rent')}>
-                Gross Rent<SortIcon col="gross_rent" />
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                  Gross Rent<SortIcon col="gross_rent" />
+                  <Tooltip content={METRIC_DEFS.grossRent} />
+                </span>
               </th>
               <th style={{ ...thBase, textAlign: 'right' }} onClick={() => handleSort('owner_payout')}>
-                Owner Payout<SortIcon col="owner_payout" />
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                  Owner Payout<SortIcon col="owner_payout" />
+                  <Tooltip content={METRIC_DEFS.ownerPayout} />
+                </span>
               </th>
               <th style={{ ...thBase, textAlign: 'left' }} onClick={() => handleSort('status')}>
                 Status<SortIcon col="status" />

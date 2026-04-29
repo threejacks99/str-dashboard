@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Tooltip from '../Tooltip'
+import { METRIC_DEFS } from '../../../lib/metricDefinitions'
 
 export interface PriorKpis {
   totalIncome: number
@@ -99,67 +101,67 @@ export default function KpiCards({
 
   const kpis = [
     {
-      label: 'Total Income',
+      label: 'Total Income',     metricKey: 'totalIncome',
       value: formatCurrency(totalIncome),
       color: '#0D2C54',
       change: p ? kpiChange(totalIncome, p.totalIncome, 'up_good', vs) : null,
     },
     {
-      label: 'Total Expenses',
+      label: 'Total Expenses',   metricKey: 'totalExpenses',
       value: formatCurrency(totalExpenses),
       color: '#FF7767',
       change: p ? kpiChange(totalExpenses, p.totalExpenses, 'down_good', vs) : null,
     },
     {
-      label: 'NOI',
+      label: 'NOI',              metricKey: 'noi',
       value: formatCurrency(noi),
       color: noi >= 0 ? '#0D2C54' : '#FF7767',
       change: p ? kpiChange(noi, p.noi, 'up_good', vs) : null,
     },
     {
-      label: 'OER',
+      label: 'OER',              metricKey: 'oer',
       value: formatPercent(oer),
       color: '#FF7767',
       change: p ? kpiChange(oer, p.oer, 'down_good', vs) : null,
     },
     {
-      label: 'Average Daily Rate',
+      label: 'Average Daily Rate', metricKey: 'adr',
       value: `$${adr.toFixed(0)}`,
       color: '#0D2C54',
       change: p ? kpiChange(adr, p.adr, 'up_good', vs) : null,
     },
     {
-      label: 'Occupancy Rate',
+      label: 'Occupancy Rate',   metricKey: 'occupancyRate',
       value: formatPercent(occupancyRate),
       color: occupancyRate >= 50 ? '#0D2C54' : '#FF7767',
       change: p ? kpiChange(occupancyRate, p.occupancyRate, 'up_good', vs) : null,
     },
     {
-      label: 'Total Bookings',
+      label: 'Total Bookings',   metricKey: null,
       value: totalBookings.toString(),
       color: '#0D2C54',
       change: p ? kpiChange(totalBookings, p.totalBookings, 'up_good', vs) : null,
     },
     {
-      label: 'Total Nights',
+      label: 'Total Nights',     metricKey: null,
       value: performanceNights.toString(),
       color: '#0D2C54',
       change: p ? kpiChange(performanceNights, p.performanceNights, 'up_good', vs) : null,
     },
     {
-      label: 'Avg Nights per Booking',
+      label: 'Avg Nights per Booking', metricKey: 'avgNightsPerBooking',
       value: avgNightsPerBooking.toFixed(1),
       color: '#0D2C54',
       change: p ? kpiChange(avgNightsPerBooking, p.avgNightsPerBooking, 'up_good', vs) : null,
     },
     {
-      label: 'Avg Guests per Booking',
+      label: 'Avg Guests per Booking', metricKey: 'avgGuestsPerBooking',
       value: avgGuestsPerBooking.toFixed(1),
       color: '#0D2C54',
       change: p ? kpiChange(avgGuestsPerBooking, p.avgGuestsPerBooking, 'neutral', vs) : null,
     },
     {
-      label: 'Avg Days Booked Ahead',
+      label: 'Avg Days Booked Ahead', metricKey: 'avgDaysBookedAhead',
       value: `${Math.round(avgLeadTime)} days`,
       color: '#0D2C54',
       change: p ? kpiChange(avgLeadTime, p.avgLeadTime, 'neutral', vs) : null,
@@ -199,8 +201,11 @@ export default function KpiCards({
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
               marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
             }}>
               {kpi.label}
+              {kpi.metricKey && <Tooltip content={METRIC_DEFS[kpi.metricKey]} />}
             </div>
             <div style={{
               fontSize: '28px',

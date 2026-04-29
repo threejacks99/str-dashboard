@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Tooltip from '../Tooltip'
+import { METRIC_DEFS } from '../../../lib/metricDefinitions'
 
 const GOOD  = '#4CAF82'
 const BAD   = '#FF7767'
@@ -59,32 +61,32 @@ export default function BookingKpiRow({
 
   const kpis = [
     {
-      label: 'Total Bookings',
+      label: 'Total Bookings',      metricKey: null,
       value: totalBookings.toString(),
       change: p ? kpiChange(totalBookings, p.totalBookings, 'up_good', vs) : null,
     },
     {
-      label: 'Total Nights',
+      label: 'Total Nights',        metricKey: null,
       value: totalNights.toString(),
       change: p ? kpiChange(totalNights, p.totalNights, 'up_good', vs) : null,
     },
     {
-      label: 'Avg Nights / Booking',
+      label: 'Avg Nights / Booking', metricKey: 'avgNightsPerBooking',
       value: avgNightsPerBooking.toFixed(1),
       change: p ? kpiChange(avgNightsPerBooking, p.avgNightsPerBooking, 'up_good', vs) : null,
     },
     {
-      label: 'Avg Guests / Booking',
+      label: 'Avg Guests / Booking', metricKey: 'avgGuestsPerBooking',
       value: avgGuestsPerBooking.toFixed(1),
       change: p ? kpiChange(avgGuestsPerBooking, p.avgGuestsPerBooking, 'neutral', vs) : null,
     },
     {
-      label: 'Avg Days Ahead',
+      label: 'Avg Days Ahead',      metricKey: 'avgDaysBookedAhead',
       value: `${Math.round(avgLeadTime)}d`,
       change: p ? kpiChange(avgLeadTime, p.avgLeadTime, 'neutral', vs) : null,
     },
     {
-      label: 'Cancellation Rate',
+      label: 'Cancellation Rate',   metricKey: 'cancellationRate',
       value: `${cancellationRate.toFixed(1)}%`,
       change: p ? kpiChange(cancellationRate, p.cancellationRate, 'down_good', vs) : null,
     },
@@ -122,8 +124,11 @@ export default function BookingKpiRow({
               letterSpacing: '0.06em',
               marginBottom: '8px',
               fontFamily: 'Raleway, sans-serif',
+              display: 'flex',
+              alignItems: 'center',
             }}>
               {kpi.label}
+              {kpi.metricKey && <Tooltip content={METRIC_DEFS[kpi.metricKey]} />}
             </div>
             <div style={{
               fontSize: '22px',

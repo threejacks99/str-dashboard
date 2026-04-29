@@ -1,3 +1,6 @@
+import Tooltip from '../Tooltip'
+import { METRIC_DEFS } from '../../../lib/metricDefinitions'
+
 const NAVY  = '#0D2C54'
 const CORAL = '#FF7767'
 const SAGE  = '#4CAF82'
@@ -221,7 +224,10 @@ export default function PLTable({
             return (
               <tr style={{ background: '#F0F4F9', borderTop: '2px solid #ddd' }}>
                 <td style={{ ...cellStyle, fontWeight: 800, fontSize: '15px', color: noiColor }}>
-                  Net Operating Income
+                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    Net Operating Income
+                    <Tooltip content={METRIC_DEFS.noi} />
+                  </span>
                 </td>
                 <td style={{ ...numCell, fontWeight: 800, fontSize: '15px', color: noiColor }}>
                   {fmtCurrency(noi)}
@@ -239,7 +245,12 @@ export default function PLTable({
             const ch = fmtChange(oer, prior?.oer, false)
             return (
               <tr style={{ background: '#F8F9FB' }}>
-                <td style={{ ...cellStyle, color: '#555' }}>Operating Expense Ratio</td>
+                <td style={{ ...cellStyle, color: '#555' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    Operating Expense Ratio
+                    <Tooltip content={METRIC_DEFS.oer} />
+                  </span>
+                </td>
                 <td style={{ ...numCell, color: '#555' }}>{fmtPct(oer)}</td>
                 <td style={{ ...numCell, color: '#888' }}>
                   {hasPrior ? fmtPct(prior!.oer) : '—'}
