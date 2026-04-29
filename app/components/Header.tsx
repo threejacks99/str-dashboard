@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import DateRangeFilter from './DateRangeFilter'
+import PropertySelector from './PropertySelector'
 
 export default function Header() {
   const router   = useRouter()
@@ -55,12 +56,17 @@ export default function Header() {
       justifyContent: 'space-between',
       flexShrink: 0,
     }}>
-      {/* Left: date range filter (dashboard only) */}
-      <div>
+      {/* Left: property selector + date range filter */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         {['/', '/financials', '/bookings'].includes(pathname) && (
-          <Suspense fallback={null}>
-            <DateRangeFilter />
-          </Suspense>
+          <>
+            <Suspense fallback={null}>
+              <PropertySelector />
+            </Suspense>
+            <Suspense fallback={null}>
+              <DateRangeFilter />
+            </Suspense>
+          </>
         )}
       </div>
 

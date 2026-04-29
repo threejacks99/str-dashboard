@@ -82,12 +82,43 @@ export default function PropertiesPage() {
   const [showForm, setShowForm]               = useState(false)
 
   async function load() {
-    const [propRes, clientRes] = await Promise.all([
-      supabase.from('properties').select('id, name, address, bedrooms, bathrooms, geocoded_at').order('name'),
-      supabase.from('clients').select('id').order('created_at', { ascending: true }).limit(1),
-    ])
-    setProperties(propRes.data ?? [])
-    if (clientRes.data?.length) setPrimaryClientId(clientRes.data[0].id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+
+    // Resolve the correct client for this user by walking account_users → clients.
+    // Never rely on "first visible client" since loose RLS could expose other accounts' rows.
+    const { data: accountUsers } = await supabase
+      .from('account_users')
+      .select('account_id, role, client_id')
+      .eq('user_id', user.id)
+
+    let resolvedClientId: string | null = null
+
+    if (accountUsers?.length) {
+      const memberRow = (accountUsers as any[]).find(au => au.role === 'member' && au.client_id)
+      if (memberRow) {
+        resolvedClientId = memberRow.client_id
+      } else {
+        const adminRow = (accountUsers as any[]).find(au => au.role === 'admin')
+        if (adminRow) {
+          const { data: clients } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('account_id', adminRow.account_id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+          resolvedClientId = (clients as any[])?.[0]?.id ?? null
+        }
+      }
+    }
+
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id, name, address, bedrooms, bathrooms, geocoded_at')
+      .order('name')
+
+    setProperties(properties ?? [])
+    setPrimaryClientId(resolvedClientId)
     setLoading(false)
   }
 

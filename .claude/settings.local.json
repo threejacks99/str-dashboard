@@ -6,7 +6,8 @@
       "Bash(npx tsc *)",
       "Bash(node *)",
       "Bash(xargs grep *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(npx next *)"
     ]
   }
 }

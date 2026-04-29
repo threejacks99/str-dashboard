@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import AuthGuard from './AuthGuard'
 import Sidebar from './Sidebar'
@@ -17,7 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#F8F9FB' }}>
-        <Sidebar />
+        <Suspense fallback={null}><Sidebar /></Suspense>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Header />
           <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>

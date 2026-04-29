@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds } from '../../lib/auth'
 import PLTable from '../components/financials/PLTable'
@@ -62,7 +64,6 @@ function getPriorDateRange(
     const y = today.getFullYear() - 2
     return { from: `${y}-01-01`, to: `${y}-12-31`, vsLabel: 'vs year before' }
   }
-
   if (preset === 'year_to_date') {
     const y  = today.getFullYear() - 1
     const mm = String(today.getMonth() + 1).padStart(2, '0')
@@ -104,7 +105,6 @@ function isCancelled(r: any): boolean {
 function buildFinancials(reservations: any[], expenses: any[]) {
   const perf = reservations.filter(r => !isOwnerStay(r) && !isCancelled(r))
 
-  // Revenue by source
   const revMap: Record<string, number> = {}
   for (const r of perf) {
     const src = r.booking_source?.trim() || 'Unknown'
@@ -114,7 +114,6 @@ function buildFinancials(reservations: any[], expenses: any[]) {
     .map(([source, amount]) => ({ source, amount: Math.round(amount) }))
     .sort((a, b) => b.amount - a.amount)
 
-  // Expenses by category
   const expMap: Record<string, number> = {}
   for (const e of expenses) {
     const cat = e.category?.trim() || 'Uncategorized'
@@ -135,12 +134,8 @@ function buildFinancials(reservations: any[], expenses: any[]) {
 function EmptyState() {
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '60vh',
-      textAlign: 'center',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
     }}>
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
       <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
@@ -150,14 +145,8 @@ function EmptyState() {
         Upload your first CSV to see your P&L report.
       </p>
       <Link href="/upload" style={{
-        background: '#FF7767',
-        color: '#fff',
-        padding: '12px 28px',
-        borderRadius: '8px',
-        fontSize: '15px',
-        fontWeight: '700',
-        textDecoration: 'none',
-        fontFamily: 'Raleway, sans-serif',
+        background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
+        fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
         Upload data
       </Link>
@@ -168,7 +157,7 @@ function EmptyState() {
 export default async function FinancialsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; preset?: string }>
+  searchParams: Promise<{ from?: string; to?: string; preset?: string; property?: string }>
 }) {
   const params     = await searchParams
   const dateRange  = getDateRangeFromParams(params)
@@ -182,29 +171,49 @@ export default async function FinancialsPage({
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('id')
+    .select('id, name')
     .in('client_id', clientIds)
+    .order('name')
 
-  const propertyIds = (properties ?? []).map((p: { id: string }) => p.id)
+  const allPropertyIds = (properties ?? []).map((p: any) => p.id)
+  if (!allPropertyIds.length) return <EmptyState />
 
-  if (!propertyIds.length) return <EmptyState />
+  // ── Resolve property filter ────────────────────────────────────────────────
+  const propertyParam = params.property
+  let effectivePropertyIds: string[]
+  let propertyLabel: string
 
+  if (propertyParam && propertyParam !== 'all') {
+    const match = (properties ?? []).find((p: any) => p.id === propertyParam)
+    if (match) {
+      effectivePropertyIds = [propertyParam]
+      propertyLabel = (match as any).name
+    } else {
+      effectivePropertyIds = allPropertyIds
+      propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
+    }
+  } else {
+    effectivePropertyIds = allPropertyIds
+    propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
+  }
+
+  // ── Fetch data ────────────────────────────────────────────────────────────
   const [
     { data: reservations },
     { data: expenses },
     { data: priorReservations },
     { data: priorExpenses },
   ] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', propertyIds)
+    supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
       .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
-    supabase.from('expenses').select('*').in('property_id', propertyIds)
+    supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
       .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to),
     priorRange
-      ? supabase.from('reservations').select('*').in('property_id', propertyIds)
+      ? supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
           .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
       : Promise.resolve({ data: null }),
     priorRange
-      ? supabase.from('expenses').select('*').in('property_id', propertyIds)
+      ? supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
           .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
       : Promise.resolve({ data: null }),
   ])
@@ -246,7 +255,7 @@ export default async function FinancialsPage({
     return { month: label, noi: Math.round((monthRevMap[key] || 0) - (monthExpMap[key] || 0)) }
   })
 
-  // ── Income by source (for pie chart) ──────────────────────────────────────
+  // ── Income by source ──────────────────────────────────────────────────────
   const totalRev = current.revenueBySource.reduce((s, r) => s + r.amount, 0)
   const incomeBySource = current.revenueBySource.map(r => ({
     source:     r.source,
@@ -255,29 +264,23 @@ export default async function FinancialsPage({
     percentage: totalRev > 0 ? (r.amount / totalRev) * 100 : 0,
   }))
 
-  // ── Recent expenses (top 50 by date desc) ────────────────────────────────
+  // ── Recent expenses ───────────────────────────────────────────────────────
   const recentExpenses = [...(expenses ?? [])]
     .sort((a: any, b: any) => (b.paid_date ?? '').localeCompare(a.paid_date ?? ''))
     .slice(0, 50)
 
-  const cardStyle: React.CSSProperties = {
-    marginBottom: '24px',
-  }
-
   return (
     <div>
-      {/* Page title */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
           Financials
         </h1>
         <p style={{ color: '#888', fontSize: '14px' }}>
-          P&amp;L deep-dive · {dateRange.label}
+          {propertyLabel} · {dateRange.label}
         </p>
       </div>
 
-      {/* 1. P&L Summary table */}
-      <div style={cardStyle}>
+      <div style={{ marginBottom: '24px' }}>
         <PLTable
           revenueBySource={current.revenueBySource}
           expensesByCategory={current.expensesByCategory}
@@ -290,21 +293,13 @@ export default async function FinancialsPage({
         />
       </div>
 
-      {/* 2. NOI Trend + Income by Source */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '16px',
-        marginBottom: '24px',
-      }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
         <NoiTrendChart data={noiTrend} />
         <IncomeBySourceChart data={incomeBySource} />
       </div>
 
-      {/* 3. Expenses by Category */}
       <ExpensesChart data={current.expensesByCategory} />
 
-      {/* 4. Recent Expenses table */}
       <ExpenseTable expenses={recentExpenses} />
     </div>
   )

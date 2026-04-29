@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds } from '../lib/auth'
 import KpiCards from './components/dashboard/KpiCards'
@@ -17,9 +19,7 @@ function daysBetween(from: string, to: string): number {
 
 // ── Date range helpers ─────────────────────────────────────────────────────────
 function getDateRangeFromParams(params: { from?: string; to?: string; preset?: string }): {
-  from: string
-  to: string
-  label: string
+  from: string; to: string; label: string
 } {
   const today    = new Date()
   const todayStr = toStr(today)
@@ -30,13 +30,11 @@ function getDateRangeFromParams(params: { from?: string; to?: string; preset?: s
     return { from: params.from, to: params.to, label: `${fmt(params.from)} – ${fmt(params.to)}` }
   }
 
-  if (preset === 'all_time') return { from: '2000-01-01', to: todayStr, label: 'All time' }
-
+  if (preset === 'all_time')    return { from: '2000-01-01', to: todayStr, label: 'All time' }
   if (preset === 'last_year') {
     const y = today.getFullYear() - 1
     return { from: `${y}-01-01`, to: `${y}-12-31`, label: 'Last year' }
   }
-
   if (preset === 'year_to_date') {
     return { from: `${today.getFullYear()}-01-01`, to: todayStr, label: 'Year to date' }
   }
@@ -65,7 +63,6 @@ function getPriorDateRange(
     const y = today.getFullYear() - 2
     return { from: `${y}-01-01`, to: `${y}-12-31`, vsLabel: 'vs year before' }
   }
-
   if (preset === 'year_to_date') {
     const y  = today.getFullYear() - 1
     const mm = String(today.getMonth() + 1).padStart(2, '0')
@@ -73,9 +70,8 @@ function getPriorDateRange(
     return { from: `${y}-01-01`, to: `${y}-${mm}-${dd}`, vsLabel: 'vs same period last year' }
   }
 
-  // For all rolling ranges: shift back by the exact same number of days
-  const len     = daysBetween(current.from, current.to)
-  const priorTo = new Date(current.from + 'T00:00:00')
+  const len      = daysBetween(current.from, current.to)
+  const priorTo  = new Date(current.from + 'T00:00:00')
   priorTo.setDate(priorTo.getDate() - 1)
   const priorFrom = new Date(current.from + 'T00:00:00')
   priorFrom.setDate(priorFrom.getDate() - len)
@@ -104,6 +100,7 @@ function computeKpis(reservations: any[], expenses: any[], days: number) {
   const oer            = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0
   const performanceNights   = perf.reduce((s, r) => s + (r.nights || 0), 0)
   const adr            = performanceNights > 0 ? totalGrossRent / performanceNights : 0
+  // days already accounts for number of properties (caller multiplies by property count)
   const occupancyRate  = (performanceNights / days) * 100
   const totalBookings  = perf.length
   const avgNightsPerBooking = totalBookings > 0 ? performanceNights / totalBookings : 0
@@ -128,12 +125,8 @@ function computeKpis(reservations: any[], expenses: any[], days: number) {
 function EmptyState() {
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '60vh',
-      textAlign: 'center',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
     }}>
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
       <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
@@ -143,14 +136,8 @@ function EmptyState() {
         You don't have any data yet. Upload your first CSV to get started.
       </p>
       <Link href="/upload" style={{
-        background: '#FF7767',
-        color: '#fff',
-        padding: '12px 28px',
-        borderRadius: '8px',
-        fontSize: '15px',
-        fontWeight: '700',
-        textDecoration: 'none',
-        fontFamily: 'Raleway, sans-serif',
+        background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
+        fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
         Upload your first CSV
       </Link>
@@ -161,7 +148,7 @@ function EmptyState() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; preset?: string }>
+  searchParams: Promise<{ from?: string; to?: string; preset?: string; property?: string }>
 }) {
   const params     = await searchParams
   const dateRange  = getDateRangeFromParams(params)
@@ -176,12 +163,38 @@ export default async function DashboardPage({
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('id')
+    .select('id, name')
     .in('client_id', clientIds)
+    .order('name')
 
-  const propertyIds = (properties ?? []).map((p: { id: string }) => p.id)
+  const allPropertyIds = (properties ?? []).map((p: any) => p.id)
+  if (!allPropertyIds.length) return <EmptyState />
 
-  if (!propertyIds.length) return <EmptyState />
+  // ── Resolve property filter ────────────────────────────────────────────────
+  const propertyParam = params.property
+  let effectivePropertyIds: string[]
+  let propertyLabel: string
+
+  if (propertyParam && propertyParam !== 'all') {
+    const match = (properties ?? []).find((p: any) => p.id === propertyParam)
+    if (match) {
+      effectivePropertyIds = [propertyParam]
+      propertyLabel = (match as any).name
+    } else {
+      // Unknown or inaccessible property — fall back to all
+      effectivePropertyIds = allPropertyIds
+      propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
+    }
+  } else {
+    effectivePropertyIds = allPropertyIds
+    propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
+  }
+
+  // Occupancy denominator: available nights = filter window × property count
+  const baseDays       = daysBetween(dateRange.from, dateRange.to)
+  const effectiveDays  = baseDays * effectivePropertyIds.length
+  const priorBaseDays  = priorRange ? daysBetween(priorRange.from, priorRange.to) : 0
+  const priorEffDays   = priorBaseDays * effectivePropertyIds.length
 
   // ── Fetch current + prior data in parallel ─────────────────────────────────
   const [
@@ -190,30 +203,26 @@ export default async function DashboardPage({
     { data: priorReservations },
     { data: priorExpenses },
   ] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', propertyIds)
+    supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
       .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
-    supabase.from('expenses').select('*').in('property_id', propertyIds)
+    supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
       .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to),
     priorRange
-      ? supabase.from('reservations').select('*').in('property_id', propertyIds)
+      ? supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
           .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
       : Promise.resolve({ data: null }),
     priorRange
-      ? supabase.from('expenses').select('*').in('property_id', propertyIds)
+      ? supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
           .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
       : Promise.resolve({ data: null }),
   ])
 
   // ── Compute KPIs ──────────────────────────────────────────────────────────
-  const current = computeKpis(
-    reservations ?? [],
-    expenses ?? [],
-    daysBetween(dateRange.from, dateRange.to)
-  )
+  const current = computeKpis(reservations ?? [], expenses ?? [], effectiveDays)
 
   let priorKpis: PriorKpis | null = null
   if (priorRange && priorReservations != null && priorExpenses != null) {
-    const p = computeKpis(priorReservations, priorExpenses, daysBetween(priorRange.from, priorRange.to))
+    const p = computeKpis(priorReservations, priorExpenses, priorEffDays)
     priorKpis = {
       totalIncome: p.totalIncome, totalExpenses: p.totalExpenses, noi: p.noi,
       oer: p.oer, adr: p.adr, occupancyRate: p.occupancyRate,
@@ -239,23 +248,23 @@ export default async function DashboardPage({
     monthlyMap[key].revenue += r.owner_payout || 0
     monthlyMap[key].nights  += r.nights || 0
   }
-  const monthlyRevenue = Object.keys(monthlyMap)
-    .sort()
-    .map(key => {
-      const [year, month] = key.split('-')
-      const label = new Date(Number(year), Number(month) - 1, 1)
-        .toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-      const { revenue, nights } = monthlyMap[key]
-      return { month: label, revenue: Math.round(revenue), nights, netAdr: nights > 0 ? Math.round(revenue / nights) : 0 }
-    })
+  const monthlyRevenue = Object.keys(monthlyMap).sort().map(key => {
+    const [year, month] = key.split('-')
+    const label = new Date(Number(year), Number(month) - 1, 1)
+      .toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+    const { revenue, nights } = monthlyMap[key]
+    return { month: label, revenue: Math.round(revenue), nights, netAdr: nights > 0 ? Math.round(revenue / nights) : 0 }
+  })
 
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
-          Siesta Palms
+          Dashboard
         </h1>
-        <p style={{ color: '#888', fontSize: '14px' }}>Performance overview · {dateRange.label}</p>
+        <p style={{ color: '#888', fontSize: '14px' }}>
+          {propertyLabel} · {dateRange.label}
+        </p>
       </div>
 
       <KpiCards

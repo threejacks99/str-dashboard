@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: '📊' },
@@ -12,8 +12,17 @@ const navItems = [
   { label: 'Import Data', href: '/upload', icon: '📁' },
 ]
 
+const ANALYTICS_PATHS = ['/', '/financials', '/bookings']
+
 export default function Sidebar() {
-  const pathname = usePathname()
+  const pathname     = usePathname()
+  const searchParams = useSearchParams()
+
+  function buildHref(itemHref: string) {
+    const qs = searchParams.toString()
+    if (!qs || !ANALYTICS_PATHS.includes(itemHref)) return itemHref
+    return `${itemHref}?${qs}`
+  }
 
   return (
     <aside style={{
@@ -49,7 +58,7 @@ export default function Sidebar() {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={buildHref(item.href)}
               style={{
                 display: 'flex',
                 alignItems: 'center',

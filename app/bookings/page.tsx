@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds } from '../../lib/auth'
 import BookingKpiRow from '../components/bookings/BookingKpiRow'
@@ -96,8 +98,8 @@ function isCancelled(r: any): boolean {
 }
 
 function buildKpis(reservations: any[]): BookingKpis {
-  const nonOwner = reservations.filter(r => !isOwnerStay(r))
-  const perf     = nonOwner.filter(r => !isCancelled(r))
+  const nonOwner  = reservations.filter(r => !isOwnerStay(r))
+  const perf      = nonOwner.filter(r => !isCancelled(r))
   const cancelled = nonOwner.filter(r => isCancelled(r))
 
   const totalBookings       = perf.length
@@ -120,12 +122,8 @@ function buildKpis(reservations: any[]): BookingKpis {
 function EmptyState() {
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '60vh',
-      textAlign: 'center',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
     }}>
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
       <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
@@ -135,14 +133,8 @@ function EmptyState() {
         Upload your first CSV to see your reservation data.
       </p>
       <Link href="/upload" style={{
-        background: '#FF7767',
-        color: '#fff',
-        padding: '12px 28px',
-        borderRadius: '8px',
-        fontSize: '15px',
-        fontWeight: '700',
-        textDecoration: 'none',
-        fontFamily: 'Raleway, sans-serif',
+        background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
+        fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
         Upload data
       </Link>
@@ -153,7 +145,7 @@ function EmptyState() {
 export default async function BookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; preset?: string }>
+  searchParams: Promise<{ from?: string; to?: string; preset?: string; property?: string }>
 }) {
   const params     = await searchParams
   const dateRange  = getDateRangeFromParams(params)
@@ -167,21 +159,41 @@ export default async function BookingsPage({
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('id')
+    .select('id, name')
     .in('client_id', clientIds)
+    .order('name')
 
-  const propertyIds = (properties ?? []).map((p: { id: string }) => p.id)
+  const allPropertyIds = (properties ?? []).map((p: any) => p.id)
+  if (!allPropertyIds.length) return <EmptyState />
 
-  if (!propertyIds.length) return <EmptyState />
+  // ── Resolve property filter ────────────────────────────────────────────────
+  const propertyParam = params.property
+  let effectivePropertyIds: string[]
+  let propertyLabel: string
 
+  if (propertyParam && propertyParam !== 'all') {
+    const match = (properties ?? []).find((p: any) => p.id === propertyParam)
+    if (match) {
+      effectivePropertyIds = [propertyParam]
+      propertyLabel = (match as any).name
+    } else {
+      effectivePropertyIds = allPropertyIds
+      propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
+    }
+  } else {
+    effectivePropertyIds = allPropertyIds
+    propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
+  }
+
+  // ── Fetch data ────────────────────────────────────────────────────────────
   const [
     { data: reservations },
     { data: priorReservations },
   ] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', propertyIds)
+    supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
       .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
     priorRange
-      ? supabase.from('reservations').select('*').in('property_id', propertyIds)
+      ? supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
           .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
       : Promise.resolve({ data: null }),
   ])
@@ -190,7 +202,7 @@ export default async function BookingsPage({
   const kpis   = buildKpis(allRes)
   const prior  = priorRange && priorReservations != null ? buildKpis(priorReservations) : null
 
-  // ── perf reservations (non-owner, non-cancelled) for charts ───────────────
+  // ── perf reservations for charts ──────────────────────────────────────────
   const perf = allRes.filter((r: any) => !isOwnerStay(r) && !isCancelled(r))
 
   // ── Bookings over time ─────────────────────────────────────────────────────
@@ -215,17 +227,10 @@ export default async function BookingsPage({
     { bucket: '8–14 nights', min: 8,  max: 14 },
     { bucket: '15+ nights',  min: 15, max: Infinity },
   ]
-  const totalPerf = perf.length
+  const totalPerf    = perf.length
   const stayDuration = BUCKETS.map(b => {
-    const count = perf.filter((r: any) => {
-      const n = r.nights ?? 0
-      return n >= b.min && n <= b.max
-    }).length
-    return {
-      bucket: b.bucket,
-      count,
-      percentage: totalPerf > 0 ? (count / totalPerf) * 100 : 0,
-    }
+    const count = perf.filter((r: any) => { const n = r.nights ?? 0; return n >= b.min && n <= b.max }).length
+    return { bucket: b.bucket, count, percentage: totalPerf > 0 ? (count / totalPerf) * 100 : 0 }
   })
 
   // ── Booking source chart ───────────────────────────────────────────────────
@@ -237,8 +242,7 @@ export default async function BookingsPage({
   const totalSourceCount = Object.values(sourceCountMap).reduce((s: number, n: number) => s + n, 0)
   const bookingsBySource = Object.entries(sourceCountMap)
     .map(([source, count]) => ({
-      source,
-      count,
+      source, count,
       percentage: totalSourceCount > 0 ? (count / totalSourceCount) * 100 : 0,
     }))
     .sort((a, b) => b.count - a.count)
@@ -253,53 +257,48 @@ export default async function BookingsPage({
   }
   const bookingsByDay = DAYS.map(day => ({ day: day.slice(0, 3), count: dayCountMap[day] }))
 
-  // ── Reservations table (all non-owner-stay reservations) ──────────────────
+  // ── Reservations table ─────────────────────────────────────────────────────
   const tableReservations = allRes
     .filter((r: any) => !isOwnerStay(r))
     .map((r: any) => ({
-      id:            r.id,
-      guest_name:    r.guest_name ?? null,
-      check_in:      r.check_in ?? null,
-      check_out:     r.check_out ?? null,
-      nights:        r.nights ?? null,
+      id:             r.id,
+      guest_name:     r.guest_name ?? null,
+      check_in:       r.check_in ?? null,
+      check_out:      r.check_out ?? null,
+      nights:         r.nights ?? null,
       booking_source: r.booking_source ?? null,
-      gross_rent:    r.gross_rent ?? null,
-      owner_payout:  r.owner_payout ?? null,
-      status:        r.status ?? null,
+      gross_rent:     r.gross_rent ?? null,
+      owner_payout:   r.owner_payout ?? null,
+      status:         r.status ?? null,
     }))
 
   return (
     <div>
-      {/* Page title */}
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>
           Bookings
         </h1>
         <p style={{ color: '#888', fontSize: '14px' }}>
-          Reservation activity · {dateRange.label}
+          {propertyLabel} · {dateRange.label}
         </p>
       </div>
 
-      {/* 1. Booking KPI row */}
       <BookingKpiRow
         {...kpis}
         prior={prior}
         vsLabel={priorRange?.vsLabel ?? null}
       />
 
-      {/* 2. Bookings Over Time + Booking Source */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         <BookingsOverTimeChart data={bookingsOverTime} />
         <BookingSourceChart data={bookingsBySource} />
       </div>
 
-      {/* 3. Stay Duration + Day of Week */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
         <StayDurationChart data={stayDuration} />
         <DayOfWeekChart data={bookingsByDay} />
       </div>
 
-      {/* 4. Reservations table */}
       <ReservationsTable reservations={tableReservations} />
     </div>
   )
