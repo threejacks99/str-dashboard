@@ -2,9 +2,35 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import DateRangeFilter from './DateRangeFilter'
 import PropertySelector from './PropertySelector'
+
+function HelpLink() {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <Link
+      href="/help"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: '13px',
+        fontWeight: 500,
+        color: hovered ? '#FF7767' : '#0D2C54',
+        textDecoration: 'none',
+        transition: 'color 0.15s ease',
+        fontFamily: 'Raleway, sans-serif',
+      }}
+    >
+      <span style={{ fontSize: '14px', lineHeight: 1 }}>?</span>
+      <span>Help</span>
+    </Link>
+  )
+}
 
 export default function Header() {
   const router   = useRouter()
@@ -70,9 +96,10 @@ export default function Header() {
         )}
       </div>
 
-      {/* Right: user avatar */}
+      {/* Right: help link + user avatar */}
       {email && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <HelpLink />
           <span style={{ fontSize: '13px', color: '#666' }}>{email}</span>
 
           {/* Avatar + dropdown */}
