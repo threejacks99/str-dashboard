@@ -9,10 +9,21 @@ export const PRESETS = [
   { id: 'last_90_days',   label: 'Last 90 days' },
   { id: 'last_6_months',  label: 'Last 6 months' },
   { id: 'last_12_months', label: 'Last 12 months' },
-  { id: 'year_to_date',   label: 'Year to date' },
   { id: 'last_year',      label: 'Last year' },
+  { id: 'this_year',      label: 'This year' },
+  { id: 'year_to_date',   label: 'Year to date' },
+  { id: 'next_30_days',   label: 'Next 30 days' },
+  { id: 'next_90_days',   label: 'Next 90 days' },
+  { id: 'all_upcoming',   label: 'All upcoming' },
   { id: 'all_time',       label: 'All time' },
 ] as const
+
+const PRESET_GROUPS: Array<{ ids: string[]; dividerAfter: boolean }> = [
+  { ids: ['last_30_days', 'last_90_days', 'last_6_months', 'last_12_months', 'last_year'], dividerAfter: true },
+  { ids: ['this_year', 'year_to_date'], dividerAfter: true },
+  { ids: ['next_30_days', 'next_90_days', 'all_upcoming'], dividerAfter: true },
+  { ids: ['all_time'], dividerAfter: false },
+]
 
 function formatDateLabel(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -136,42 +147,49 @@ export default function DateRangeFilter() {
           {/* Preset list */}
           {!customMode && (
             <>
-              {PRESETS.map(preset => {
-                const isSelected = urlPreset === preset.id
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() => applyPreset(preset.id)}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: '10px 16px',
-                      background: isSelected ? '#FFF5F4' : 'none',
-                      border: 'none',
-                      textAlign: 'left',
-                      fontSize: '14px',
-                      fontWeight: isSelected ? '700' : '400',
-                      color: isSelected ? '#FF7767' : '#0D2C54',
-                      fontFamily: 'Raleway, sans-serif',
-                      cursor: 'pointer',
-                      transition: 'background 0.1s ease',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isSelected) e.currentTarget.style.background = '#F9FAFB'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = isSelected ? '#FFF5F4' : 'none'
-                    }}
-                  >
-                    {isSelected && <span style={{ marginRight: '8px' }}>✓</span>}
-                    {!isSelected && <span style={{ marginRight: '8px', opacity: 0 }}>✓</span>}
-                    {preset.label}
-                  </button>
-                )
-              })}
+              {PRESET_GROUPS.map((group, gi) => (
+                <div key={gi}>
+                  {group.ids.map(id => {
+                    const preset = PRESETS.find(p => p.id === id)!
+                    const isSelected = urlPreset === preset.id
+                    return (
+                      <button
+                        key={preset.id}
+                        onClick={() => applyPreset(preset.id)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '10px 16px',
+                          background: isSelected ? '#FFF5F4' : 'none',
+                          border: 'none',
+                          textAlign: 'left',
+                          fontSize: '14px',
+                          fontWeight: isSelected ? '700' : '400',
+                          color: isSelected ? '#FF7767' : '#0D2C54',
+                          fontFamily: 'Raleway, sans-serif',
+                          cursor: 'pointer',
+                          transition: 'background 0.1s ease',
+                        }}
+                        onMouseEnter={e => {
+                          if (!isSelected) e.currentTarget.style.background = '#F9FAFB'
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = isSelected ? '#FFF5F4' : 'none'
+                        }}
+                      >
+                        {isSelected && <span style={{ marginRight: '8px' }}>✓</span>}
+                        {!isSelected && <span style={{ marginRight: '8px', opacity: 0 }}>✓</span>}
+                        {preset.label}
+                      </button>
+                    )
+                  })}
+                  {group.dividerAfter && (
+                    <div style={{ height: '1px', background: '#f0f0f0', margin: '4px 0' }} />
+                  )}
+                </div>
+              ))}
 
-              {/* Divider + Custom option */}
-              <div style={{ height: '1px', background: '#f0f0f0', margin: '4px 0' }} />
+              {/* Custom option */}
               <button
                 onClick={openCustomMode}
                 style={{

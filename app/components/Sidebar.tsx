@@ -9,7 +9,7 @@ const navItems = [
   { label: 'Financials', href: '/financials', icon: '💰' },
   { label: 'Bookings', href: '/bookings', icon: '📅' },
   { label: 'Properties', href: '/properties', icon: '🏠' },
-  { label: 'Import Data', href: '/upload', icon: '📁' },
+  { label: 'Add Data', href: '/upload', icon: '📁' },
 ]
 
 const ANALYTICS_PATHS = ['/', '/financials', '/bookings']
