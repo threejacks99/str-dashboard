@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 const navItems = [
-  { label: 'Dashboard',  href: '/',           icon: '📊' },
+  { label: 'Dashboard',  href: '/dashboard',  icon: '📊' },
   { label: 'Financials', href: '/financials',  icon: '💰' },
   { label: 'Bookings',   href: '/bookings',    icon: '📅' },
   { label: 'Reports',    href: '/reports',     icon: '📄' },
@@ -13,7 +13,7 @@ const navItems = [
   { label: 'Add Data',   href: '/upload',      icon: '📁' },
 ]
 
-const ANALYTICS_PATHS = ['/', '/financials', '/bookings', '/reports']
+const ANALYTICS_PATHS = ['/dashboard', '/financials', '/bookings', '/reports']
 
 export default function Sidebar() {
   const pathname     = usePathname()
@@ -53,8 +53,8 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav style={{ padding: '16px 12px', flex: 1 }}>
         {navItems.map(item => {
-          const isActive = item.href === '/'
-            ? pathname === '/'
+          const isActive = item.href === '/dashboard'
+            ? pathname === '/dashboard'
             : pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link

@@ -6,7 +6,7 @@ import AuthGuard from './AuthGuard'
 import Sidebar from './Sidebar'
 import Header from './Header'
 
-const PUBLIC_ROUTES = ['/login']
+const PUBLIC_ROUTES = ['/', '/login']
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
