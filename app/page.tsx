@@ -157,13 +157,13 @@ function EmptyState() {
         Welcome to Hostics!
       </h2>
       <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
-        You don't have any data yet. Upload your first CSV to get started.
+        You don't have any data yet. Upload your first CSV or Excel file to get started.
       </p>
       <Link href="/upload" style={{
         background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
         fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
-        Upload your first CSV
+        Upload your first file
       </Link>
     </div>
   )

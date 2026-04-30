@@ -1,3 +1,26 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// String sanitization policy
+//
+// All string values from any source (CSV, Excel, or direct entry forms) are run
+// through sanitizeString() before being written to the database. It strips:
+//   - Control characters (U+0000-U+001F, U+007F-U+009F)
+//   - The Unicode replacement character (U+FFFD) -- common in bad Excel exports
+//   - Any code point outside printable ASCII (0x20-0x7E)
+//   - Leading and trailing whitespace
+//
+// The database layer mirrors this via CHECK constraints on the same columns,
+// so any row that somehow bypasses the application layer is rejected at insert.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function sanitizeString(value: string | null | undefined): string | null {
+  if (!value) return null
+  const cleaned = value
+    .normalize('NFKC')             // convert Unicode equivalents to ASCII where possible
+    .replace(/[^\x20-\x7E]/g, '')  // strip everything outside printable ASCII
+    .trim()
+  return cleaned || null
+}
+
 // ── Date parsing ──────────────────────────────────────────────────────────────
 // Handles: YYYY-MM-DD (ISO), M/D/YYYY (US), D/M/YYYY (international),
 // and long-form strings like "Dec 21, 2024" that JS Date() can parse.
@@ -133,7 +156,7 @@ export function mapRow(
       const parsed = value ? parseDate(value) : null
       mapped[standardField] = parsed ? `${parsed}T00:00:00.000Z` : null
     } else {
-      mapped[standardField] = value || null
+      mapped[standardField] = sanitizeString(value)
     }
   }
 
@@ -229,7 +252,7 @@ export function mapExpenseRow(
         }
       }
     } else {
-      mapped[standardField] = value || null
+      mapped[standardField] = sanitizeString(value)
     }
   }
 

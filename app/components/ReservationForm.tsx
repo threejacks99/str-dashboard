@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { sanitizeString } from '../../lib/csvMapper'
 
 interface Property { id: string; name: string }
 
@@ -135,9 +136,9 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
 
     const payload = {
       property_id: propertyId,
-      reservation_ref: reservationRef.trim() || null,
-      guest_name: guestName.trim() || null,
-      booking_source: bookingSource,
+      reservation_ref: sanitizeString(reservationRef),
+      guest_name: sanitizeString(guestName),
+      booking_source: sanitizeString(bookingSource) ?? bookingSource,
       check_in: checkIn,
       check_out: checkOut,
       nights,
@@ -147,7 +148,7 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
       mgmt_fee: resolvedMgmtFee,
       owner_payout: parseCurrency(ownerPayout),
       booking_created_at: bookingCreatedAt ? `${bookingCreatedAt}T00:00:00.000Z` : null,
-      status,
+      status: sanitizeString(status) ?? status,
     }
 
     console.log('[ReservationForm] Inserting:', payload)

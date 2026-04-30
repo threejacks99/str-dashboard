@@ -155,7 +155,7 @@ function EmptyState() {
         No bookings yet
       </h2>
       <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
-        Upload your first CSV to see your reservation data.
+        Upload your first CSV or Excel file to see your reservation data.
       </p>
       <Link href="/upload" style={{
         background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',

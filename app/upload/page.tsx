@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
 import { mapColumns, mapRow, detectFileType, mapExpenseColumns, mapExpenseRow } from '../../lib/csvMapper'
 import { supabase } from '../../lib/supabase'
 import PropertyForm from '../components/PropertyForm'
@@ -319,6 +320,65 @@ export default function UploadPage() {
   }
 
   // ── File parsing ──────────────────────────────────────────────────────────────
+  function cleanHeader(header: string): string {
+    return Array.from(header)
+      .filter(ch => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126)
+      .join('')
+      .trim()
+  }
+
+  function processParseResult(headers: string[], rows: Record<string, string>[]) {
+    const detected = detectFileType(headers)
+    setFileType(detected)
+
+    if (detected === 'unknown') {
+      setParseStatus('Could not detect file type. Please upload a reservations or expenses CSV or Excel file.')
+      return
+    }
+
+    const filteredRows = rows.filter(row =>
+      Object.values(row).some(v => v != null && String(v).trim() !== '')
+    )
+    let valid: Record<string, any>[]
+    let invalid: InvalidRow[]
+
+    if (detected === 'reservations') {
+      const mapped = filteredRows.map(row => mapRow(row, mapColumns(headers)))
+      valid = mapped.filter(r => r.check_in && r.check_out)
+      invalid = mapped
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => !r.check_in || !r.check_out)
+        .map(({ r, i }) => ({
+          index: i,
+          reason: (r._errors as string[] | undefined)?.join('; ')
+            ?? (!r.check_in ? 'Missing or invalid check-in date' : 'Missing or invalid check-out date'),
+        }))
+    } else {
+      const mapped = filteredRows.map(row => mapExpenseRow(row, mapExpenseColumns(headers)))
+      valid = mapped.filter(r => r.paid_date && r.amount)
+      invalid = mapped
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => !r.paid_date || !r.amount)
+        .map(({ r, i }) => ({
+          index: i,
+          reason: (r._errors as string[] | undefined)?.join('; ')
+            ?? (!r.paid_date ? 'Missing or invalid date' : 'Missing amount'),
+        }))
+    }
+
+    setValidRows(valid)
+    setInvalidRows(invalid)
+    setParseStatus('')
+
+    if (selectedPropertyId && (detected === 'reservations' || detected === 'expenses')) {
+      runCheckDuplicates(valid, detected, selectedPropertyId)
+    } else {
+      setReadyRows(valid)
+      setDuplicateCount(0)
+      setDuplicatesChecked(false)
+    }
+  }
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -334,68 +394,47 @@ export default function UploadPage() {
     setShowInvalidDetail(false)
     setFilename(file.name)
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      transformHeader: (header: string) =>
-        Array.from(header)
-          .filter(ch => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126)
-          .join('')
-          .trim(),
-      complete: (results) => {
-        const headers = results.meta.fields ?? []
-        const detected = detectFileType(headers)
-        setFileType(detected)
+    const ext = file.name.split('.').pop()?.toLowerCase()
 
-        if (detected === 'unknown') {
-          setParseStatus('Could not detect file type. Please upload a reservations or expenses CSV.')
-          return
+    if (ext === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        transformHeader: cleanHeader,
+        complete: (results) => processParseResult(results.meta.fields ?? [], results.data as Record<string, string>[]),
+        error: (err: any) => setParseStatus(`Error reading file: ${err.message}`),
+      })
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader()
+      reader.onload = (evt) => {
+        try {
+          const workbook = XLSX.read(evt.target?.result as ArrayBuffer, { type: 'array' })
+          const sheet = workbook.Sheets[workbook.SheetNames[0]]
+          const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '', raw: false })
+
+          if (rawRows.length === 0) {
+            setParseStatus('The file appears to be empty.')
+            return
+          }
+
+          const originalHeaders = Object.keys(rawRows[0])
+          const headers = originalHeaders.map(cleanHeader)
+          const cleanedRows = rawRows.map(row =>
+            Object.fromEntries(
+              originalHeaders.map((orig, i) => [headers[i], String(row[orig] ?? '')])
+            ) as Record<string, string>
+          )
+
+          processParseResult(headers, cleanedRows)
+        } catch (err: any) {
+          setParseStatus(`Error reading Excel file: ${err.message}`)
         }
-
-        const rows = (results.data as Record<string, string>[]).filter(row =>
-          Object.values(row).some(v => v != null && String(v).trim() !== '')
-        )
-        let valid: Record<string, any>[]
-        let invalid: InvalidRow[]
-
-        if (detected === 'reservations') {
-          const mapped = rows.map(row => mapRow(row, mapColumns(headers)))
-          valid = mapped.filter(r => r.check_in && r.check_out)
-          invalid = mapped
-            .map((r, i) => ({ r, i }))
-            .filter(({ r }) => !r.check_in || !r.check_out)
-            .map(({ r, i }) => ({
-              index: i,
-              reason: (r._errors as string[] | undefined)?.join('; ')
-                ?? (!r.check_in ? 'Missing or invalid check-in date' : 'Missing or invalid check-out date'),
-            }))
-        } else {
-          const mapped = rows.map(row => mapExpenseRow(row, mapExpenseColumns(headers)))
-          valid = mapped.filter(r => r.paid_date && r.amount)
-          invalid = mapped
-            .map((r, i) => ({ r, i }))
-            .filter(({ r }) => !r.paid_date || !r.amount)
-            .map(({ r, i }) => ({
-              index: i,
-              reason: (r._errors as string[] | undefined)?.join('; ')
-                ?? (!r.paid_date ? 'Missing or invalid date' : 'Missing amount'),
-            }))
-        }
-
-        setValidRows(valid)
-        setInvalidRows(invalid)
-        setParseStatus('')
-
-        if (selectedPropertyId && (detected === 'reservations' || detected === 'expenses')) {
-          runCheckDuplicates(valid, detected, selectedPropertyId)
-        } else {
-          setReadyRows(valid)
-          setDuplicateCount(0)
-          setDuplicatesChecked(false)
-        }
-      },
-      error: (err: any) => setParseStatus(`Error reading file: ${err.message}`),
-    })
+      }
+      reader.onerror = () => setParseStatus('Error reading file. Please try again.')
+      reader.readAsArrayBuffer(file)
+    } else {
+      setParseStatus('Unsupported file type. Please upload a CSV or Excel (.xlsx, .xls) file.')
+    }
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────────
@@ -482,16 +521,16 @@ export default function UploadPage() {
     <main style={{ padding: '40px', maxWidth: '960px', fontFamily: 'Raleway, sans-serif' }}>
       <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0D2C54', marginBottom: '4px' }}>Add Data</h1>
       <p style={{ color: '#666', fontSize: '14px', marginBottom: '32px' }}>
-        Log a reservation or expense, or bulk-import historical data from a CSV export.
+        Log a reservation or expense, or bulk-import historical data from a CSV or Excel export.
       </p>
 
       {/* ── Action cards ────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '36px' }}>
         <ActionCard
           icon="📂"
-          title="Upload CSV"
+          title="Upload CSV or Excel"
           description="Bulk import historical data from any platform"
-          buttonLabel={showCsvSection ? 'Hide upload' : 'Upload CSV'}
+          buttonLabel={showCsvSection ? 'Hide upload' : 'Upload CSV or Excel'}
           active={showCsvSection}
           onAction={() => setShowCsvSection(v => !v)}
         />
@@ -519,7 +558,7 @@ export default function UploadPage() {
         />
       </div>
 
-      {/* ── CSV Upload section ───────────────────────────────────────────────── */}
+      {/* ── File upload section ─────────────────────────────────────────────── */}
       {showCsvSection && (
         <>
           {properties.length === 0 ? (
@@ -590,7 +629,7 @@ export default function UploadPage() {
 
               {/* ── File input ──────────────────────────────────────────────── */}
               <div style={{ ...cardStyle, marginBottom: '24px' }}>
-                <div style={labelStyle}>CSV File</div>
+                <div style={labelStyle}>CSV or Excel File</div>
                 {selectedProperty && (
                   <p style={{ fontSize: '13px', color: '#888', marginBottom: '10px' }}>
                     Uploading to: <strong style={{ color: '#0D2C54' }}>{selectedProperty.name}</strong>
@@ -604,7 +643,7 @@ export default function UploadPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={handleFile}
                   disabled={uploading}
                   style={{ display: 'block', cursor: uploading ? 'not-allowed' : 'pointer' }}

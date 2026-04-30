@@ -20,7 +20,7 @@ function EmptyState() {
         No data to export yet
       </h2>
       <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
-        Upload your first CSV to generate tax-ready reports.
+        Upload your first CSV or Excel file to generate tax-ready reports.
       </p>
       <Link href="/upload" style={{
         background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { sanitizeString } from '../../lib/csvMapper'
 
 interface Property { id: string; name: string }
 
@@ -94,11 +95,11 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
     const payload = {
       property_id: propertyId,
       paid_date: paidDate,
-      vendor: vendor.trim() || null,
-      description: description.trim() || null,
+      vendor: sanitizeString(vendor),
+      description: sanitizeString(description),
       amount: parseCurrency(amount),
-      category,
-      frequency,
+      category: sanitizeString(category) ?? category,
+      frequency: sanitizeString(frequency) ?? frequency,
     }
 
     console.log('[ExpenseForm] Inserting:', payload)
