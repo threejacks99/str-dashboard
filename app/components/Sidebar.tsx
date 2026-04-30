@@ -5,14 +5,15 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 const navItems = [
-  { label: 'Dashboard', href: '/', icon: '📊' },
-  { label: 'Financials', href: '/financials', icon: '💰' },
-  { label: 'Bookings', href: '/bookings', icon: '📅' },
-  { label: 'Properties', href: '/properties', icon: '🏠' },
-  { label: 'Add Data', href: '/upload', icon: '📁' },
+  { label: 'Dashboard',  href: '/',           icon: '📊' },
+  { label: 'Financials', href: '/financials',  icon: '💰' },
+  { label: 'Bookings',   href: '/bookings',    icon: '📅' },
+  { label: 'Reports',    href: '/reports',     icon: '📄' },
+  { label: 'Properties', href: '/properties',  icon: '🏠' },
+  { label: 'Add Data',   href: '/upload',      icon: '📁' },
 ]
 
-const ANALYTICS_PATHS = ['/', '/financials', '/bookings']
+const ANALYTICS_PATHS = ['/', '/financials', '/bookings', '/reports']
 
 export default function Sidebar() {
   const pathname     = usePathname()
