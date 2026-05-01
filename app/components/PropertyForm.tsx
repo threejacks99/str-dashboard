@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useBillingStatus } from '../../lib/useBillingStatus'
+import BillingLockScreen from './BillingLockScreen'
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const labelStyle: React.CSSProperties = {
@@ -126,6 +128,7 @@ export default function PropertyForm({
   onSuccess,
   onCancel,
 }: PropertyFormProps) {
+  const { isLocked } = useBillingStatus()
   const [name, setName]                   = useState(initialValues?.name ?? '')
   const [address, setAddress]             = useState(initialValues?.address ?? '')
   const [bedrooms, setBedrooms]           = useState(initialValues?.bedrooms ?? '')
@@ -243,6 +246,8 @@ export default function PropertyForm({
   }
 
   const busy = saving || geocoding
+
+  if (isLocked) return <BillingLockScreen />
 
   return (
     <form onSubmit={handleSubmit} style={{ fontFamily: 'Raleway, sans-serif' }}>

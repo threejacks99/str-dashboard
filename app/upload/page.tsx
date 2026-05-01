@@ -10,6 +10,8 @@ import PropertyForm from '../components/PropertyForm'
 import Modal from '../components/Modal'
 import ReservationForm from '../components/ReservationForm'
 import ExpenseForm from '../components/ExpenseForm'
+import { useBillingStatus } from '../../lib/useBillingStatus'
+import BillingLockScreen from '../components/BillingLockScreen'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Property {
@@ -208,6 +210,7 @@ export default function UploadPage() {
   // History
   const [uploadHistory, setUploadHistory] = useState<UploadHistoryRow[]>([])
 
+  const { isLocked } = useBillingStatus()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Data loading ─────────────────────────────────────────────────────────────
@@ -525,7 +528,8 @@ export default function UploadPage() {
       </p>
 
       {/* ── Action cards ────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '36px' }}>
+      {isLocked && <BillingLockScreen />}
+      {!isLocked && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '36px' }}>
         <ActionCard
           icon="📂"
           title="Upload CSV or Excel"
@@ -556,7 +560,7 @@ export default function UploadPage() {
           onAction={() => {}}
           comingSoon
         />
-      </div>
+      </div>}
 
       {/* ── File upload section ─────────────────────────────────────────────── */}
       {showCsvSection && (

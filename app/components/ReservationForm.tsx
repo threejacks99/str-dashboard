@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { sanitizeString } from '../../lib/csvMapper'
+import { useBillingStatus } from '../../lib/useBillingStatus'
+import BillingLockScreen from './BillingLockScreen'
 
 interface Property { id: string; name: string }
 
@@ -69,6 +71,7 @@ function Req() {
 }
 
 export default function ReservationForm({ onSuccess, onCancel }: Props) {
+  const { isLocked } = useBillingStatus()
   const [properties, setProperties] = useState<Property[]>([])
   const [propsLoading, setPropsLoading] = useState(true)
 
@@ -169,6 +172,8 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
   if (propsLoading) {
     return <div style={{ padding: '24px', textAlign: 'center', color: '#888', fontSize: '14px' }}>Loading…</div>
   }
+
+  if (isLocked) return <BillingLockScreen />
 
   if (properties.length === 0) {
     return (

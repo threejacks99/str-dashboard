@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import AuthGuard from './AuthGuard'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import TrialBanner from './TrialBanner'
 
 const PUBLIC_ROUTES = ['/', '/login']
 
@@ -21,6 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Suspense fallback={null}><Sidebar /></Suspense>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Header />
+          <TrialBanner />
           <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
             {children}
           </main>

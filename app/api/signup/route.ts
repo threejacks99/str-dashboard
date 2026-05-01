@@ -49,7 +49,13 @@ export async function POST(req: NextRequest) {
     // ── Step 2: Create the account record ───────────────────────────────────
     const { data: account, error: accountError } = await admin
       .from('accounts')
-      .insert({ name: accountName?.trim() || email, billing_email: email, plan: 'trial' })
+      .insert({
+        name: accountName?.trim() || email,
+        billing_email: email,
+        plan: 'trial',
+        subscription_status: 'trialing',
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      })
       .select('id')
       .single()
     if (accountError) throw new Error(`Could not create account: ${accountError.message}`)

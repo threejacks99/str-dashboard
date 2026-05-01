@@ -84,7 +84,7 @@ export default function Header() {
     }}>
       {/* Left: property selector + date range filter */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {['/', '/financials', '/bookings'].includes(pathname) && (
+        {['/dashboard', '/financials', '/bookings'].includes(pathname) && (
           <>
             <Suspense fallback={null}>
               <PropertySelector />
@@ -142,6 +142,28 @@ export default function Header() {
                 zIndex: 100,
                 overflow: 'hidden',
               }}>
+                <a
+                  href="/billing"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'none',
+                    border: 'none',
+                    textAlign: 'left',
+                    fontSize: '14px',
+                    color: '#0D2C54',
+                    textDecoration: 'none',
+                    fontFamily: 'Raleway, sans-serif',
+                    fontWeight: '500',
+                    transition: 'background 0.12s ease',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget.style.background = '#F5F7FA') }}
+                  onMouseLeave={e => { (e.currentTarget.style.background = 'none') }}
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  Billing
+                </a>
                 <button
                   onClick={handleSignOut}
                   disabled={signingOut}
@@ -150,6 +172,7 @@ export default function Header() {
                     padding: '12px 16px',
                     background: 'none',
                     border: 'none',
+                    borderTop: '1px solid #f0f0f0',
                     textAlign: 'left',
                     fontSize: '14px',
                     color: signingOut ? '#aaa' : '#0D2C54',
