@@ -4,7 +4,6 @@ import { cookies } from 'next/headers'
 export type UserAccountInfo = {
   account_id: string
   role: 'admin' | 'member'
-  client_id: string | null
 }
 
 // Creates a Supabase client that reads the logged-in user's session from
@@ -44,8 +43,6 @@ export async function getCurrentUser() {
 }
 
 // Returns all account_users rows for the current user.
-// Each row carries account_id, role, and an optional client_id (used for
-// members restricted to a single client).
 export async function getCurrentUserAccount(): Promise<UserAccountInfo[]> {
   const supabase = await createAuthenticatedClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -53,38 +50,26 @@ export async function getCurrentUserAccount(): Promise<UserAccountInfo[]> {
 
   const { data } = await supabase
     .from('account_users')
-    .select('account_id, role, client_id')
+    .select('account_id, role')
     .eq('user_id', user.id)
 
   return (data ?? []) as UserAccountInfo[]
 }
 
-// Returns the IDs of every client the user is allowed to see.
-//   admin  → all clients belonging to their account(s)
-//   member → only the specific client pinned to their account_users row
+// Returns every client ID belonging to any account the user is a member of.
+// No role filtering — owners-only product, all account members see all clients.
 export async function getAccessibleClientIds(
   userAccountInfo: UserAccountInfo[]
 ): Promise<string[]> {
   if (!userAccountInfo.length) return []
 
-  const memberClientIds = userAccountInfo
-    .filter(au => au.role === 'member' && au.client_id)
-    .map(au => au.client_id as string)
-
-  const adminAccountIds = userAccountInfo
-    .filter(au => au.role === 'admin')
-    .map(au => au.account_id)
-
-  if (!adminAccountIds.length) return memberClientIds
+  const accountIds = userAccountInfo.map(au => au.account_id)
 
   const supabase = await createAuthenticatedClient()
   const { data: clients } = await supabase
     .from('clients')
     .select('id')
-    .in('account_id', adminAccountIds)
+    .in('account_id', accountIds)
 
-  const adminClientIds = (clients ?? []).map((c: { id: string }) => c.id)
-
-  // Deduplicate in case a user is both admin and pinned member of an account
-  return [...new Set([...adminClientIds, ...memberClientIds])]
+  return (clients ?? []).map((c: { id: string }) => c.id)
 }

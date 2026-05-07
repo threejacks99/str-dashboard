@@ -14,19 +14,19 @@ const TIERS = [
     features: ['1 property', 'Revenue & expense tracking', 'Tax-ready reports', 'CSV & Excel import'],
   },
   {
-    id: 'multi',
+    id: 'portfolio',
     name: 'Up to 10 Properties',
     price: '$79',
-    description: 'Ideal for small-scale operators growing their portfolio.',
+    description: 'For owners building a rental portfolio.',
     features: ['Up to 10 properties', 'Everything in Single', 'Multi-property analytics', 'Priority support'],
     highlighted: true,
   },
   {
-    id: 'manager',
+    id: 'investor',
     name: 'Up to 50 Properties',
     price: '$199',
-    description: 'Built for professional managers and property management companies.',
-    features: ['Up to 50 properties', 'Everything in Multi', 'White-label reports', 'Dedicated support'],
+    description: 'For serious investors managing a sizable rental portfolio.',
+    features: ['Up to 50 properties', 'Everything in Multi', 'Dedicated support'],
   },
 ]
 
@@ -94,7 +94,7 @@ export default function BillingPage() {
     }
   }
 
-  const currentTier = status?.subscription_tier ?? null
+  const currentTier = status?.subscription_tier
   const isActive    = status?.subscription_status === 'active'
   const isTrialing  = status?.subscription_status === 'trialing'
   const daysLeft    = daysRemaining(status?.trial_ends_at ?? null)
@@ -128,9 +128,11 @@ export default function BillingPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '16px', fontWeight: 700, color: '#0D2C54', fontFamily: 'Raleway, sans-serif' }}>
-                {currentTier ? TIER_LABELS[currentTier] : 'No active plan'}
+                {status.subscription_tier
+                  ? TIER_LABELS[status.subscription_tier]
+                  : 'No plan selected'}
               </span>
-              <StatusBadge status={status.subscription_status} />
+              <StatusBadge status={status.subscription_status ?? 'incomplete'} />
             </div>
             {isTrialing && daysLeft > 0 && (
               <span style={{ fontSize: '13px', color: '#666', fontFamily: 'Raleway, sans-serif' }}>

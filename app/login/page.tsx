@@ -1,8 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 
 const labelStyle: React.CSSProperties = {
@@ -37,10 +37,14 @@ const toggleStyle: React.CSSProperties = {
   fontFamily: 'Raleway, sans-serif',
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialEmail = searchParams.get('email') ?? ''
+  const invited = searchParams.get('invited') === '1'
+
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -129,6 +133,21 @@ export default function LoginPage() {
         }}>
           {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
         </h2>
+
+        {invited && mode === 'signin' && (
+          <div style={{
+            background: '#F0FFF8',
+            border: '1px solid #A8E6C3',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            marginBottom: '20px',
+            fontSize: '13px',
+            color: '#1A6E47',
+            lineHeight: 1.5,
+          }}>
+            Account created. Sign in to access your dashboard.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (
@@ -220,5 +239,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   )
 }

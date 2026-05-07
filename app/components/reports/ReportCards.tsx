@@ -1,7 +1,10 @@
 'use client'
 
 import React, { useRef, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { useBillingStatus } from '../../../lib/useBillingStatus'
+import { getFeatures } from '../../../lib/billing'
 import type { ReportData, ScheduleELine } from './TaxSummaryPDF'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -195,6 +198,11 @@ export default function ReportCards({ properties }: Props) {
   const [loadingExcel,        setLoadingExcel]       = useState(false)
   const [toast,               setToast]              = useState<{ msg: string; ok: boolean } | null>(null)
 
+  const router = useRouter()
+  const { status, loading: billingLoading } = useBillingStatus()
+  const canGeneratePdf = getFeatures(status).scheduleEPdf
+  const canGenerateExcel = getFeatures(status).excelExport
+
   const propertyOptions = [
     ...(properties.length > 1 ? [{ value: 'all', label: `All Properties (${properties.length})` }] : []),
     ...properties.map(p => ({ value: p.id, label: p.name })),
@@ -253,6 +261,14 @@ export default function ReportCards({ properties }: Props) {
     }
   }
 
+  function handlePdfClick() {
+    if (!canGeneratePdf) {
+      router.push('/billing')
+      return
+    }
+    handleGeneratePdf()
+  }
+
   async function handleGenerateExcel() {
     setLoadingExcel(true)
     try {
@@ -271,6 +287,14 @@ export default function ReportCards({ properties }: Props) {
     } finally {
       setLoadingExcel(false)
     }
+  }
+
+  function handleExcelClick() {
+    if (!canGenerateExcel) {
+      router.push('/billing')
+      return
+    }
+    handleGenerateExcel()
   }
 
   const btnDisabled = loadingPdf || loadingExcel
@@ -358,14 +382,14 @@ export default function ReportCards({ properties }: Props) {
           </ul>
 
           <button
-            onClick={handleGeneratePdf}
-            disabled={btnDisabled || !properties.length}
+            onClick={handlePdfClick}
+            disabled={btnDisabled || !properties.length || billingLoading}
             style={{
-              background: (btnDisabled || !properties.length) ? '#faa99f' : '#FF7767',
+              background: (btnDisabled || !properties.length || billingLoading) ? '#faa99f' : '#FF7767',
               color: '#fff', border: 'none', borderRadius: '8px',
               padding: '12px 20px', fontSize: '14px', fontWeight: 700,
               fontFamily: 'Raleway, sans-serif',
-              cursor: (btnDisabled || !properties.length) ? 'not-allowed' : 'pointer',
+              cursor: (btnDisabled || !properties.length || billingLoading) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               transition: 'background 0.15s ease',
             }}
@@ -379,6 +403,8 @@ export default function ReportCards({ properties }: Props) {
                 }} />
                 Generating…
               </>
+            ) : !canGeneratePdf ? (
+              <><span>🔒</span> Upgrade to export</>
             ) : (
               <><span>📄</span> Generate PDF</>
             )}
@@ -417,14 +443,14 @@ export default function ReportCards({ properties }: Props) {
           </ul>
 
           <button
-            onClick={handleGenerateExcel}
-            disabled={btnDisabled || !properties.length}
+            onClick={handleExcelClick}
+            disabled={btnDisabled || !properties.length || billingLoading}
             style={{
-              background: (btnDisabled || !properties.length) ? '#faa99f' : '#FF7767',
+              background: (btnDisabled || !properties.length || billingLoading) ? '#faa99f' : '#FF7767',
               color: '#fff', border: 'none', borderRadius: '8px',
               padding: '12px 20px', fontSize: '14px', fontWeight: 700,
               fontFamily: 'Raleway, sans-serif',
-              cursor: (btnDisabled || !properties.length) ? 'not-allowed' : 'pointer',
+              cursor: (btnDisabled || !properties.length || billingLoading) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               transition: 'background 0.15s ease',
             }}
@@ -438,6 +464,8 @@ export default function ReportCards({ properties }: Props) {
                 }} />
                 Generating…
               </>
+            ) : !canGenerateExcel ? (
+              <><span>🔒</span> Upgrade to export</>
             ) : (
               <><span>📊</span> Download Excel</>
             )}

@@ -20,7 +20,7 @@ export async function GET() {
 
     const { data: account } = await supabase
       .from('accounts')
-      .select('subscription_status, subscription_tier, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id')
+      .select('subscription_status, subscription_tier, billing_interval, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id')
       .eq('id', auRow.account_id)
       .single()
 

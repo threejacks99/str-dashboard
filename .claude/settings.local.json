@@ -8,7 +8,8 @@
       "Bash(xargs grep *)",
       "Bash(npm uninstall *)",
       "Bash(npx next *)",
-      "Bash(grep -A 20 \"## Use$\\\\|^## Use$\" node_modules/react-markdown/readme.md)"
+      "Bash(grep -A 20 \"## Use$\\\\|^## Use$\" node_modules/react-markdown/readme.md)",
+      "Bash(npm run *)"
     ]
   }
 }

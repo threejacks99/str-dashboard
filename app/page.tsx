@@ -271,7 +271,7 @@ function HeroSection() {
               padding: '5px 14px', marginBottom: '20px',
             }}>
               <span style={{ fontSize: '10px', fontWeight: '700', color: CORAL, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                For Property Managers &amp; STR Hosts
+                For STR Owners &amp; Investors
               </span>
             </div>
           </FadeIn>
@@ -304,7 +304,7 @@ function HeroSection() {
 
           <FadeIn delay={320}>
             <p style={{ fontSize: '13px', color: '#aaa' }}>
-              ⭐⭐⭐⭐⭐&nbsp; Trusted by hosts and property managers across the US
+              ⭐⭐⭐⭐⭐&nbsp; Trusted by short-term rental owners across the US
             </p>
           </FadeIn>
         </div>
@@ -349,7 +349,7 @@ function ProblemSection() {
             Your booking platform shows income. Hostics shows the truth.
           </h2>
           <p style={{ fontSize: '16px', color: '#666', marginBottom: '48px', maxWidth: '520px', lineHeight: '1.65' }}>
-            Most rental tools track what comes in, but ignore what goes out. That gap leaves owners and managers flying blind.
+            Most rental tools track what comes in, but ignore what goes out. That gap leaves owners flying blind.
           </p>
         </FadeIn>
 
@@ -600,11 +600,11 @@ function FeaturesSection() {
           <FeatureRow
             tag="Multi-Property"
             headline="Manage one property or fifty. Same clean view."
-            desc="Built for everyone from the solo Airbnb host to property managers running portfolios. Switch between individual properties or roll everything up into one view."
+            desc="Built for owners running anything from a single rental to a fifty-property portfolio. Switch between individual properties or roll everything up into one view."
             bullets={[
               'Property selector with portfolio rollup',
               'Per-property and aggregated metrics',
-              'White-label option for property managers',
+              'Per-property and portfolio-wide tax exports',
             ]}
             visual={<PropertySelectorVisual />}
             reversed
@@ -727,9 +727,9 @@ function PricingSection() {
           </FadeIn>
           <FadeIn delay={100}>
             <PricingCard
-              tier="Multi-Property"
+              tier="Portfolio"
               name="Up to 10 Properties"
-              desc="For hosts with a portfolio or small property managers."
+              desc="For owners building a rental portfolio."
               price="$79"
               features={['Up to 10 properties', 'Portfolio rollup view', 'All analytics dashboards', 'Smart CSV/Excel import', 'Tax-ready exports', 'Priority email support']}
               featured
@@ -737,11 +737,11 @@ function PricingSection() {
           </FadeIn>
           <FadeIn delay={200}>
             <PricingCard
-              tier="Property Manager"
-              name="Up to 50 Properties + White-label"
-              desc="For property management companies serving many owners."
+              tier="Investor"
+              name="Up to 50 Properties"
+              desc="For serious investors managing a sizable rental portfolio."
               price="$199"
-              features={['Up to 50 properties', 'White-label branding', 'Owner-facing dashboards', 'All analytics dashboards', 'Tax-ready exports', 'Dedicated support']}
+              features={['Up to 50 properties', 'Portfolio rollup view', 'All analytics dashboards', 'Smart CSV/Excel import', 'Tax-ready exports', 'Dedicated support']}
             />
           </FadeIn>
         </div>
@@ -921,7 +921,7 @@ function Footer() {
               style={{ height: 'auto', display: 'block', marginBottom: '14px' }}
             />
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.65', maxWidth: '220px' }}>
-              The analytics dashboard for short-term rental hosts and property managers.
+              The analytics dashboard for short-term rental owners.
             </p>
           </div>
 

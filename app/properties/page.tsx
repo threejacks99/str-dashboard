@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import { useBillingStatus } from '../../lib/useBillingStatus'
+import { TIER_PROPERTY_CAPS } from '../../lib/billing'
 import PropertyForm from '../components/PropertyForm'
 
 interface Property {
@@ -81,6 +84,12 @@ export default function PropertiesPage() {
   const [loading, setLoading]                 = useState(true)
   const [showForm, setShowForm]               = useState(false)
 
+  const router = useRouter()
+  const { status, loading: billingLoading } = useBillingStatus()
+  const tier = status?.subscription_tier ?? null
+  const cap = tier ? TIER_PROPERTY_CAPS[tier] : null
+  const atCap = cap !== null && properties.length >= cap
+
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
@@ -89,27 +98,20 @@ export default function PropertiesPage() {
     // Never rely on "first visible client" since loose RLS could expose other accounts' rows.
     const { data: accountUsers } = await supabase
       .from('account_users')
-      .select('account_id, role, client_id')
+      .select('account_id')
       .eq('user_id', user.id)
 
     let resolvedClientId: string | null = null
 
     if (accountUsers?.length) {
-      const memberRow = (accountUsers as any[]).find(au => au.role === 'member' && au.client_id)
-      if (memberRow) {
-        resolvedClientId = memberRow.client_id
-      } else {
-        const adminRow = (accountUsers as any[]).find(au => au.role === 'admin')
-        if (adminRow) {
-          const { data: clients } = await supabase
-            .from('clients')
-            .select('id')
-            .eq('account_id', adminRow.account_id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-          resolvedClientId = (clients as any[])?.[0]?.id ?? null
-        }
-      }
+      const accountIds = (accountUsers as { account_id: string }[]).map(au => au.account_id)
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id')
+        .in('account_id', accountIds)
+        .order('created_at', { ascending: true })
+        .limit(1)
+      resolvedClientId = (clients as { id: string }[] | null)?.[0]?.id ?? null
     }
 
     const { data: properties } = await supabase
@@ -135,6 +137,14 @@ export default function PropertiesPage() {
       setProperties(prev => [...prev, data as Property].sort((a, b) => a.name.localeCompare(b.name)))
     }
     setShowForm(false)
+  }
+
+  function handleAddPropertyClick() {
+    if (atCap) {
+      router.push('/billing')
+      return
+    }
+    setShowForm(true)
   }
 
   if (loading) {
@@ -164,14 +174,16 @@ export default function PropertiesPage() {
         </div>
         {!showForm && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleAddPropertyClick}
+            disabled={billingLoading}
             style={{
               padding: '10px 22px', background: '#FF7767', color: '#fff',
               border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '700',
-              fontFamily: 'Raleway, sans-serif', cursor: 'pointer',
+              fontFamily: 'Raleway, sans-serif',
+              cursor: billingLoading ? 'not-allowed' : 'pointer',
             }}
           >
-            + Add Property
+            {atCap ? '🔒 Property limit reached' : '+ Add Property'}
           </button>
         )}
       </div>

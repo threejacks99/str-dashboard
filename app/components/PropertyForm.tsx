@@ -192,25 +192,42 @@ export default function PropertyForm({
         return
       }
 
-      const { data, error } = await supabase
-        .from('properties')
-        .insert({ ...payload, client_id: primaryClientId })
-        .select('id, name')
-        .single()
-
-      setSaving(false)
-
-      if (error) {
-        setCreateError(error.message)
+      // Server resolves client_id from session — no need to send it.
+      let res: Response
+      try {
+        res = await fetch('/api/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      } catch (err: any) {
+        setSaving(false)
+        setCreateError(err?.message ?? 'Network error. Please try again.')
         return
       }
 
-      const newProperty = data as { id: string; name: string }
+      const result = await res.json().catch(() => ({}))
+      setSaving(false)
 
+      if (!res.ok) {
+        if (result?.code === 'CAP_EXCEEDED') {
+          const cap = result.cap
+          const tier = result.tier
+          setCreateError(
+            `You've reached your ${tier} plan limit of ${cap} ${cap === 1 ? 'property' : 'properties'}. Upgrade to add more.`
+          )
+        } else if (result?.code === 'LOCKED') {
+          setCreateError('Your account is locked. Please update your billing to continue.')
+        } else {
+          setCreateError(result?.error ?? `Request failed (${res.status})`)
+        }
+        return
+      }
+
+      const newProperty = result as { id: string; name: string }
       if (address.trim()) {
         await runGeocode(address.trim(), newProperty.id)
       }
-
       onSuccess(newProperty)
     } else {
       // Edit mode
