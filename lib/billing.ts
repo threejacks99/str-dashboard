@@ -29,6 +29,12 @@ export const TIER_PROPERTY_CAPS: Record<Tier, number> = {
   investor:  50,
 }
 
+export const TIER_PRICES: Record<Tier, Record<BillingInterval, number>> = {
+  solo:      { monthly: 15,  annual: 149 },
+  portfolio: { monthly: 39,  annual: 389 },
+  investor:  { monthly: 169, annual: 1690 },
+}
+
 export type FeatureFlags = {
   scheduleEPdf: boolean
   excelExport: boolean
