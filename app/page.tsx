@@ -297,7 +297,7 @@ function HeroSection() {
           <FadeIn delay={240}>
             <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '28px' }}>
               <Link href="/login?signup=1" className="landing-btn-primary">
-                Start free trial — no credit card →
+                Start free trial →
               </Link>
               <a href="#features" className="landing-btn-outline">
                 See how it works
@@ -704,7 +704,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Can I cancel anytime?',
-    a: 'Yes. Cancel anytime from your account settings — no phone calls, no questions asked. You\'ll have access until the end of your billing period, and your data stays available for 30 days after cancellation in case you change your mind.',
+    a: 'Yes. Cancel anytime from your account settings — no phone calls, no questions asked. You\'ll keep access until the end of your billing period.',
   },
   {
     q: 'Is my data secure?',
@@ -812,7 +812,7 @@ function CtaSection() {
             Start your free trial →
           </Link>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', marginTop: '20px' }}>
-            14 days free · No credit card required · Cancel anytime
+            14-day free trial · Cancel anytime
           </p>
         </FadeIn>
       </div>
