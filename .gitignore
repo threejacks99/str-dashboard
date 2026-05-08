@@ -43,3 +43,6 @@ next-env.d.ts
 # Project Knowledge upload snapshots — flattened copies of source files,
 # not part of the build. Regenerated each time Project Knowledge is refreshed.
 __project-upload/
+
+# Local-only working doc — strategy notes, not for the public repo
+claude_handoff_template.md
