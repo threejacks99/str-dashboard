@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import TierPicker from './components/TierPicker'
+import { type Tier, type BillingInterval } from '../lib/billing'
 
 // ── Brand tokens ───────────────────────────────────────────────────────────────
 const CORAL     = '#FF7767'
@@ -108,7 +111,7 @@ function Navbar() {
         {/* Right actions — desktop */}
         <div className="landing-nav-actions">
           <Link href="/login" className="landing-signin-link">Sign In</Link>
-          <Link href="/login" className="landing-cta-btn">Start Free Trial</Link>
+          <Link href="/login?signup=1" className="landing-cta-btn">Start Free Trial</Link>
         </div>
 
         {/* Hamburger — mobile */}
@@ -151,7 +154,7 @@ function Navbar() {
             <Link href="/login" style={{ fontSize: '15px', fontWeight: '600', color: NAVY, textDecoration: 'none' }}>
               Sign In
             </Link>
-            <Link href="/login" style={{
+            <Link href="/login?signup=1" style={{
               background: CORAL, color: '#fff', padding: '10px 20px',
               borderRadius: '8px', fontSize: '14px', fontWeight: '700',
               textDecoration: 'none',
@@ -293,7 +296,7 @@ function HeroSection() {
 
           <FadeIn delay={240}>
             <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '28px' }}>
-              <Link href="/login" className="landing-btn-primary">
+              <Link href="/login?signup=1" className="landing-btn-primary">
                 Start free trial — no credit card →
               </Link>
               <a href="#features" className="landing-btn-outline">
@@ -639,67 +642,13 @@ function FeaturesSection() {
 }
 
 // ── SECTION 5: Pricing ─────────────────────────────────────────────────────────
-function PricingCard({
-  tier, name, desc, price, features, featured, ctaLabel,
-}: {
-  tier: string; name: string; desc: string; price: string
-  features: string[]; featured?: boolean; ctaLabel?: string
-}) {
-  return (
-    <div style={{
-      background: '#fff',
-      border: `2px solid ${featured ? CORAL : '#eee'}`,
-      borderRadius: '16px', padding: '32px 28px',
-      boxShadow: featured ? `0 8px 40px ${CORAL}22` : '0 2px 12px rgba(0,0,0,0.06)',
-      display: 'flex', flexDirection: 'column', position: 'relative',
-    }}>
-      {featured && (
-        <div style={{
-          position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
-          background: CORAL, color: '#fff', borderRadius: '20px',
-          padding: '4px 16px', fontSize: '11px', fontWeight: '700',
-          letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-        }}>
-          Most Popular
-        </div>
-      )}
-      <div style={{ fontSize: '10px', fontWeight: '700', color: CORAL, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px' }}>
-        {tier}
-      </div>
-      <div style={{ fontSize: '20px', fontWeight: '800', color: NAVY, marginBottom: '8px' }}>{name}</div>
-      <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.5', marginBottom: '24px', minHeight: '40px' }}>{desc}</div>
-      <div style={{ marginBottom: '28px' }}>
-        <span style={{ fontSize: '36px', fontWeight: '800', color: NAVY }}>{price}</span>
-        <span style={{ fontSize: '14px', color: '#aaa', marginLeft: '4px' }}>/month</span>
-      </div>
-      <ul style={{ listStyle: 'none', padding: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px' }}>
-        {features.map(f => (
-          <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '14px', color: '#555' }}>
-            <span style={{ color: SAGE, fontWeight: '700', flexShrink: 0, marginTop: '1px' }}>✓</span>
-            {f}
-          </li>
-        ))}
-      </ul>
-      <Link
-        href="/login"
-        style={{
-          display: 'block', textAlign: 'center',
-          background: featured ? CORAL : 'transparent',
-          color: featured ? '#fff' : NAVY,
-          border: `2px solid ${featured ? CORAL : NAVY}`,
-          borderRadius: '10px', padding: '13px 20px',
-          fontSize: '15px', fontWeight: '700', textDecoration: 'none',
-          transition: 'all 0.15s ease',
-        }}
-        className="landing-pricing-cta"
-      >
-        {ctaLabel ?? 'Start free trial'}
-      </Link>
-    </div>
-  )
-}
-
 function PricingSection() {
+  const router = useRouter()
+
+  function handleSelect(tier: Tier, interval: BillingInterval) {
+    router.push(`/login?tier=${tier}&interval=${interval}`)
+  }
+
   return (
     <section id="pricing" style={{ background: '#F8F9FB', padding: '96px 32px' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
@@ -710,50 +659,16 @@ function PricingSection() {
               Simple pricing. No surprises.
             </h2>
             <p style={{ fontSize: '16px', color: '#888', lineHeight: '1.6' }}>
-              Start with a 14-day free trial. No credit card required.
+              All plans include a 14-day free trial. Card required at signup. Cancel anytime.
             </p>
           </div>
         </FadeIn>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'start', paddingTop: '14px' }}>
-          <FadeIn delay={0}>
-            <PricingCard
-              tier="Solo Host"
-              name="Single Property"
-              desc="Perfect for individual hosts running one rental property."
-              price="$29"
-              features={['1 property', 'All analytics dashboards', 'Smart CSV/Excel import', 'Tax-ready exports', 'Email support']}
-            />
-          </FadeIn>
-          <FadeIn delay={100}>
-            <PricingCard
-              tier="Portfolio"
-              name="Up to 10 Properties"
-              desc="For owners building a rental portfolio."
-              price="$79"
-              features={['Up to 10 properties', 'Portfolio rollup view', 'All analytics dashboards', 'Smart CSV/Excel import', 'Tax-ready exports', 'Priority email support']}
-              featured
-            />
-          </FadeIn>
-          <FadeIn delay={200}>
-            <PricingCard
-              tier="Investor"
-              name="Up to 50 Properties"
-              desc="For serious investors managing a sizable rental portfolio."
-              price="$199"
-              features={['Up to 50 properties', 'Portfolio rollup view', 'All analytics dashboards', 'Smart CSV/Excel import', 'Tax-ready exports', 'Dedicated support']}
-            />
-          </FadeIn>
-        </div>
-
         <FadeIn delay={100}>
-          <p style={{ textAlign: 'center', marginTop: '36px', fontSize: '14px', color: '#aaa' }}>
-            Need something different?{' '}
-            <a href="mailto:hello@hostics.app" style={{ color: CORAL, fontWeight: '600', textDecoration: 'none' }}>
-              Contact us for custom pricing
-            </a>{' '}
-            for 50+ properties.
-          </p>
+          <TierPicker
+            onSelect={handleSelect}
+            ctaLabel="Start free trial"
+          />
         </FadeIn>
       </div>
     </section>
@@ -885,7 +800,7 @@ function CtaSection() {
           <p style={{ fontSize: '17px', color: 'rgba(255,255,255,0.65)', marginBottom: '36px', lineHeight: '1.6' }}>
             Setup takes 5 minutes. Your first insights are ready today.
           </p>
-          <Link href="/login" style={{
+          <Link href="/login?signup=1" style={{
             display: 'inline-block', background: CORAL, color: '#fff',
             padding: '16px 36px', borderRadius: '10px',
             fontSize: '17px', fontWeight: '700', textDecoration: 'none',
@@ -1043,9 +958,6 @@ export default function LandingPage() {
           transition: background 0.15s, color 0.15s; white-space: nowrap;
         }
         .landing-btn-outline:hover { background: #0D2C54; color: #fff; }
-
-        /* Pricing CTA hover */
-        .landing-pricing-cta:hover { opacity: 0.88; }
 
         /* Final CTA */
         .landing-cta-hero:hover { transform: translateY(-2px); box-shadow: 0 8px 32px #FF776788 !important; }

@@ -7,6 +7,14 @@ import { supabase } from '../../lib/supabase'
 import TierPicker from '../components/TierPicker'
 import { type Tier, type BillingInterval } from '../../lib/billing'
 
+function isValidTier(value: string | null): value is Tier {
+  return value === 'solo' || value === 'portfolio' || value === 'investor'
+}
+
+function isValidInterval(value: string | null): value is BillingInterval {
+  return value === 'monthly' || value === 'annual'
+}
+
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '13px',
@@ -55,15 +63,23 @@ function LoginPageContent() {
   const initialEmail = searchParams.get('email') ?? ''
   const invited = searchParams.get('invited') === '1'
 
-  const [mode, setMode]     = useState<'signin' | 'signup'>('signin')
+  const tierParam = searchParams.get('tier')
+  const intervalParam = searchParams.get('interval')
+  const signupParam = searchParams.get('signup') === '1'
+
+  const initialTier: Tier | undefined = isValidTier(tierParam) ? tierParam : undefined
+  const initialInterval: BillingInterval = isValidInterval(intervalParam) ? intervalParam : 'monthly'
+  const initialMode: 'signin' | 'signup' = (initialTier || signupParam) ? 'signup' : 'signin'
+
+  const [mode, setMode]     = useState<'signin' | 'signup'>(initialMode)
   const [email, setEmail]   = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [name, setName]     = useState('')
   const [error, setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const [selectedTier, setSelectedTier]         = useState<Tier | undefined>(undefined)
-  const [selectedInterval, setSelectedInterval] = useState<BillingInterval>('monthly')
+  const [selectedTier, setSelectedTier]         = useState<Tier | undefined>(initialTier)
+  const [selectedInterval, setSelectedInterval] = useState<BillingInterval>(initialInterval)
 
   function switchMode(next: 'signin' | 'signup') {
     setMode(next)
@@ -289,6 +305,7 @@ function LoginPageContent() {
               }}
               onIntervalChange={(interval) => setSelectedInterval(interval)}
               selectedTier={selectedTier}
+              initialInterval={initialInterval}
               ctaLabel="Select"
               requireSelection={true}
             />
