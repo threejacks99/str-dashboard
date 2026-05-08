@@ -71,18 +71,24 @@ const TIER_MARKETING: Record<CardKey, MarketingEntry> = {
 
 export type TierPickerProps = {
   onSelect: (tier: Tier, interval: BillingInterval) => void
+  onIntervalChange?: (interval: BillingInterval) => void
   ctaLabel?: string
   selectedTier?: Tier
   currentTier?: Tier
+  currentInterval?: BillingInterval
+  requireSelection?: boolean
   showEnterprise?: boolean
   initialInterval?: BillingInterval
 }
 
 export default function TierPicker({
   onSelect,
+  onIntervalChange,
   ctaLabel = 'Choose this plan',
   selectedTier,
   currentTier,
+  currentInterval,
+  requireSelection = false,
   showEnterprise = true,
   initialInterval = 'monthly',
 }: TierPickerProps) {
@@ -91,6 +97,11 @@ export default function TierPicker({
   const cards: CardKey[] = showEnterprise
     ? ['solo', 'portfolio', 'investor', 'enterprise']
     : ['solo', 'portfolio', 'investor']
+
+  function handleIntervalChange(next: BillingInterval) {
+    setBillingInterval(next)
+    onIntervalChange?.(next)
+  }
 
   return (
     <div>
@@ -105,7 +116,7 @@ export default function TierPicker({
         }}>
           <button
             type="button"
-            onClick={() => setBillingInterval('monthly')}
+            onClick={() => handleIntervalChange('monthly')}
             style={{
               padding: '10px 20px',
               borderRadius: '999px',
@@ -122,7 +133,7 @@ export default function TierPicker({
           </button>
           <button
             type="button"
-            onClick={() => setBillingInterval('annual')}
+            onClick={() => handleIntervalChange('annual')}
             style={{
               padding: '10px 20px',
               borderRadius: '999px',
@@ -164,6 +175,8 @@ export default function TierPicker({
             interval={billingInterval}
             selectedTier={selectedTier}
             currentTier={currentTier}
+            currentInterval={currentInterval}
+            requireSelection={requireSelection}
             ctaLabel={ctaLabel}
             onSelect={onSelect}
           />
@@ -178,6 +191,8 @@ function Card({
   interval,
   selectedTier,
   currentTier,
+  currentInterval,
+  requireSelection,
   ctaLabel,
   onSelect,
 }: {
@@ -185,6 +200,8 @@ function Card({
   interval: BillingInterval
   selectedTier?: Tier
   currentTier?: Tier
+  currentInterval?: BillingInterval
+  requireSelection: boolean
   ctaLabel: string
   onSelect: (tier: Tier, interval: BillingInterval) => void
 }) {
@@ -192,10 +209,13 @@ function Card({
   const isPortfolio  = cardKey === 'portfolio'
   const isEnterprise = cardKey === 'enterprise'
   const isSelected   = !isEnterprise && selectedTier === cardKey
-  const isCurrent    = !isEnterprise && currentTier === cardKey
+  const isCurrent    = !isEnterprise
+    && currentTier === cardKey
+    && (currentInterval === undefined || currentInterval === interval)
   // Coral/featured treatment: explicit selection wins; otherwise Portfolio is
   // the default highlighted card.
-  const isFeatured   = isSelected || (!selectedTier && isPortfolio)
+  const isFeatured   = isSelected
+    || (!selectedTier && !requireSelection && isPortfolio)
 
   return (
     <div style={{
@@ -346,7 +366,7 @@ function Card({
             fontFamily: 'Raleway, sans-serif',
           }}
         >
-          {ctaLabel}
+          {isSelected ? '✓ Selected' : ctaLabel}
         </button>
       )}
     </div>

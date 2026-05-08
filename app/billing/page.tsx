@@ -41,6 +41,17 @@ export default function BillingPage() {
     setError(null)
     setCheckoutLoading(true)
     try {
+      // Active or trialing subscribers route to the Customer Portal
+      // for plan switches — avoids double-subscriptions.
+      if (status?.stripe_subscription_id) {
+        const res = await fetch('/api/stripe/portal', { method: 'POST' })
+        const data = await res.json()
+        if (!res.ok || !data.url) throw new Error(data.error ?? 'Failed to open portal')
+        window.location.href = data.url
+        return
+      }
+
+      // No existing subscription — start fresh Checkout.
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,6 +183,8 @@ export default function BillingPage() {
       <TierPicker
         onSelect={handleChoosePlan}
         currentTier={currentTier}
+        currentInterval={status?.billing_interval ?? undefined}
+        ctaLabel={status?.stripe_subscription_id ? 'Switch to this plan' : 'Choose this plan'}
       />
 
       <p style={{

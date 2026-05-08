@@ -1,8 +1,20 @@
 'use client'
 
 import Link from 'next/link'
+import { useBillingStatus } from '../../lib/useBillingStatus'
 
 export default function BillingLockScreen() {
+  const { status } = useBillingStatus()
+  const isOrphan = !status?.stripe_customer_id
+
+  const headline = isOrphan
+    ? 'Finish setting up your account'
+    : 'Trial ended'
+
+  const subcopy = isOrphan
+    ? 'Pick a plan to start your 14-day trial. Card required up front — not charged until day 15.'
+    : 'Add a payment method to continue entering data and keep your properties active.'
+
   return (
     <div style={{
       display: 'flex',
@@ -21,7 +33,7 @@ export default function BillingLockScreen() {
         color: '#0D2C54',
         fontFamily: 'Raleway, sans-serif',
       }}>
-        Trial ended
+        {headline}
       </h2>
       <p style={{
         margin: 0,
@@ -31,7 +43,7 @@ export default function BillingLockScreen() {
         lineHeight: 1.6,
         fontFamily: 'Raleway, sans-serif',
       }}>
-        Add a payment method to continue entering data and keep your properties active.
+        {subcopy}
       </p>
       <Link
         href="/billing"
