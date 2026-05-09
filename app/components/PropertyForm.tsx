@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useBillingStatus } from '../../lib/useBillingStatus'
 import BillingLockScreen from './BillingLockScreen'
+import Modal from './Modal'
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const labelStyle: React.CSSProperties = {
@@ -148,6 +149,12 @@ export default function PropertyForm({
   const [banner, setBanner]       = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
 
+  const [overageConfirm, setOverageConfirm] = useState<{
+    rate: number
+    interval: 'monthly' | 'annual'
+  } | null>(null)
+  const [pendingPayload, setPendingPayload] = useState<any>(null)
+
   async function runGeocode(addr: string, id: string): Promise<boolean> {
     setGeocoding(true)
     const res = await fetch('/api/geocode', {
@@ -169,12 +176,64 @@ export default function PropertyForm({
     return true
   }
 
+  async function attemptSave(payload: any, confirmOverage: boolean) {
+    setSaving(true)
+    setCreateError(null)
+
+    let res: Response
+    try {
+      res = await fetch('/api/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(confirmOverage ? { ...payload, confirmOverage: true } : payload),
+      })
+    } catch (err: any) {
+      setSaving(false)
+      setCreateError(err?.message ?? 'Network error. Please try again.')
+      return
+    }
+
+    const result = await res.json().catch(() => ({}))
+
+    // Soft-cap path — only on first attempt (confirmOverage === false).
+    if (res.ok && result?.status === 'needs_confirmation' && !confirmOverage) {
+      setSaving(false)
+      setPendingPayload(payload)
+      setOverageConfirm({
+        rate: result.overageRate,
+        interval: result.interval,
+      })
+      return
+    }
+
+    setSaving(false)
+
+    if (!res.ok) {
+      if (result?.code === 'CAP_EXCEEDED') {
+        const cap = result.cap
+        const tier = result.tier
+        setCreateError(
+          `You've reached your ${tier} plan limit of ${cap} ${cap === 1 ? 'property' : 'properties'}. Upgrade to add more.`
+        )
+      } else if (result?.code === 'LOCKED') {
+        setCreateError('Your account is locked. Please update your billing to continue.')
+      } else {
+        setCreateError(result?.error ?? `Request failed (${res.status})`)
+      }
+      return
+    }
+
+    const newProperty = result as { id: string; name: string }
+    if (address.trim()) {
+      await runGeocode(address.trim(), newProperty.id)
+    }
+    onSuccess(newProperty)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    setSaving(true)
     setBanner(null)
-    setCreateError(null)
 
     const payload = {
       name: name.trim(),
@@ -188,49 +247,13 @@ export default function PropertyForm({
     if (mode === 'create') {
       if (!primaryClientId) {
         setCreateError('No client found for your account.')
-        setSaving(false)
         return
       }
-
-      // Server resolves client_id from session — no need to send it.
-      let res: Response
-      try {
-        res = await fetch('/api/properties', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-      } catch (err: any) {
-        setSaving(false)
-        setCreateError(err?.message ?? 'Network error. Please try again.')
-        return
-      }
-
-      const result = await res.json().catch(() => ({}))
-      setSaving(false)
-
-      if (!res.ok) {
-        if (result?.code === 'CAP_EXCEEDED') {
-          const cap = result.cap
-          const tier = result.tier
-          setCreateError(
-            `You've reached your ${tier} plan limit of ${cap} ${cap === 1 ? 'property' : 'properties'}. Upgrade to add more.`
-          )
-        } else if (result?.code === 'LOCKED') {
-          setCreateError('Your account is locked. Please update your billing to continue.')
-        } else {
-          setCreateError(result?.error ?? `Request failed (${res.status})`)
-        }
-        return
-      }
-
-      const newProperty = result as { id: string; name: string }
-      if (address.trim()) {
-        await runGeocode(address.trim(), newProperty.id)
-      }
-      onSuccess(newProperty)
+      await attemptSave(payload, false)
     } else {
       // Edit mode
+      setSaving(true)
+      setCreateError(null)
       const { error } = await supabase
         .from('properties')
         .update(payload)
@@ -267,6 +290,7 @@ export default function PropertyForm({
   if (isLocked) return <BillingLockScreen />
 
   return (
+    <>
     <form onSubmit={handleSubmit} style={{ fontFamily: 'Raleway, sans-serif' }}>
       {/* Banner (edit mode only) */}
       {mode === 'edit' && banner && (
@@ -477,5 +501,61 @@ export default function PropertyForm({
         )}
       </div>
     </form>
+
+    {overageConfirm && (
+      <Modal
+        isOpen={true}
+        onClose={() => { setOverageConfirm(null); setPendingPayload(null) }}
+        title="Add property and adjust subscription?"
+      >
+        <p style={{ fontSize: '14px', color: '#0D2C54', lineHeight: 1.5, marginTop: 0 }}>
+          You&apos;re at your Portfolio plan&apos;s 10-property limit. Adding this
+          property will charge an additional{' '}
+          <strong>${overageConfirm.rate}/{overageConfirm.interval === 'monthly' ? 'mo' : 'yr'}</strong>{' '}
+          per property over 10, billed starting your next renewal.
+        </p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => { setOverageConfirm(null); setPendingPayload(null) }}
+            style={{
+              fontSize: '14px',
+              color: '#888',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'Raleway, sans-serif',
+              padding: 0,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const p = pendingPayload
+              setOverageConfirm(null)
+              setPendingPayload(null)
+              attemptSave(p, true)
+            }}
+            style={{
+              padding: '12px 32px',
+              background: '#FF7767',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: '700',
+              fontFamily: 'Raleway, sans-serif',
+              cursor: 'pointer',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            Add property (+${overageConfirm.rate}/{overageConfirm.interval === 'monthly' ? 'mo' : 'yr'})
+          </button>
+        </div>
+      </Modal>
+    )}
+    </>
   )
 }

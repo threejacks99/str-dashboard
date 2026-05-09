@@ -88,7 +88,8 @@ export default function PropertiesPage() {
   const { status, loading: billingLoading } = useBillingStatus()
   const tier = status?.subscription_tier ?? null
   const cap = tier ? TIER_PROPERTY_CAPS[tier] : null
-  const atCap = cap !== null && properties.length >= cap
+  const isPortfolio = tier === 'portfolio'
+  const atHardCap = !isPortfolio && cap !== null && properties.length >= cap
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -140,7 +141,7 @@ export default function PropertiesPage() {
   }
 
   function handleAddPropertyClick() {
-    if (atCap) {
+    if (atHardCap) {
       router.push('/billing')
       return
     }
@@ -183,7 +184,7 @@ export default function PropertiesPage() {
               cursor: billingLoading ? 'not-allowed' : 'pointer',
             }}
           >
-            {atCap ? '🔒 Property limit reached' : '+ Add Property'}
+            {atHardCap ? '🔒 Property limit reached' : '+ Add Property'}
           </button>
         )}
       </div>

@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
 import { createAuthenticatedClient } from '../../../lib/auth'
-import { isAccountLocked, TIER_PROPERTY_CAPS, type BillingStatus, type Tier } from '../../../lib/billing'
+import {
+  isAccountLocked,
+  TIER_PROPERTY_CAPS,
+  PORTFOLIO_OVERAGE_RATE,
+  getPortfolioOveragePriceId,
+  calculateOverage,
+  type BillingStatus,
+  type Tier,
+} from '../../../lib/billing'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +28,7 @@ export async function POST(req: NextRequest) {
       bathrooms?: number | null
       total_nights_available?: number
       property_value?: number | null
+      confirmOverage?: boolean
     }
 
     if (typeof body.name !== 'string' || body.name.trim() === '') {
@@ -72,16 +84,43 @@ export async function POST(req: NextRequest) {
 
     const currentCount = count ?? 0
     if (currentCount >= cap) {
-      return NextResponse.json(
-        {
-          error: `You have reached your plan's property limit (${cap}). Upgrade to add more properties.`,
-          code: 'CAP_EXCEEDED',
-          currentCount,
-          cap,
-          tier,
-        },
-        { status: 403 }
-      )
+      if (tier === 'portfolio') {
+        if (!body.confirmOverage) {
+          // Soft cap — needs user confirmation before adding overage.
+          return NextResponse.json(
+            {
+              status: 'needs_confirmation',
+              currentCount,
+              cap,
+              tier,
+              interval: status.billing_interval,
+              overageRate: status.billing_interval
+                ? PORTFOLIO_OVERAGE_RATE[status.billing_interval]
+                : null,
+            },
+            { status: 200 }
+          )
+        }
+        // Confirmed overage — defensive checks before insert + Stripe update.
+        if (!status.stripe_subscription_id || !status.billing_interval) {
+          return NextResponse.json(
+            { error: 'Subscription not configured for overage' },
+            { status: 500 }
+          )
+        }
+      } else {
+        // Solo and Investor stay hard 403.
+        return NextResponse.json(
+          {
+            error: `You have reached your plan's property limit (${cap}). Upgrade to add more properties.`,
+            code: 'CAP_EXCEEDED',
+            currentCount,
+            cap,
+            tier,
+          },
+          { status: 403 }
+        )
+      }
     }
 
     const { data: client } = await supabase
@@ -116,9 +155,37 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    if (tier === 'portfolio' && currentCount + 1 > TIER_PROPERTY_CAPS.portfolio) {
+      try {
+        const overagePriceId = getPortfolioOveragePriceId(status.billing_interval!)
+        const sub = await stripe.subscriptions.retrieve(status.stripe_subscription_id!)
+        const existing = sub.items.data.find(i => i.price.id === overagePriceId)
+        const newQuantity = calculateOverage('portfolio', status.billing_interval, currentCount + 1).units
+
+        const itemUpdate = existing
+          ? { id: existing.id, quantity: newQuantity }
+          : { price: overagePriceId, quantity: newQuantity }
+
+        await stripe.subscriptions.update(status.stripe_subscription_id!, {
+          items: [itemUpdate],
+          proration_behavior: 'none',
+        })
+      } catch (err) {
+        // Rollback the just-inserted property so we don't leak revenue.
+        await supabase.from('properties').delete().eq('id', newProp.id)
+        const msg = err instanceof Error ? err.message : 'Failed to update subscription'
+        console.error('[api/properties POST overage]', msg)
+        return NextResponse.json(
+          { error: `Couldn't update subscription: ${msg}` },
+          { status: 500 }
+        )
+      }
+    }
+
     return NextResponse.json({
-      id:   newProp.id   as string,
-      name: newProp.name as string,
+      status: 'created',
+      id:     newProp.id   as string,
+      name:   newProp.name as string,
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to create property'
@@ -126,3 +193,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+// TODO: Phase 8b — delete-side overage decrement.
+// Build DELETE /api/properties/[id] that:
+//   1. deletes the property (with cascade behavior decided then)
+//   2. on Portfolio, recomputes overage quantity = max(0, count - 10)
+//   3. calls stripe.subscriptions.update with proration_behavior: 'none'
+//   4. removes the overage item entirely (items: [{ id, deleted: true }])
+//      when quantity would drop to 0.
