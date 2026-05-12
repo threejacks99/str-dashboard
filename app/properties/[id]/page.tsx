@@ -21,6 +21,7 @@ export default function EditPropertyPage() {
         .from('properties')
         .select('id, name, address, bedrooms, bathrooms, total_nights_available, property_value, latitude, longitude, geocoded_at')
         .eq('id', id)
+        .is('deleted_at', null)
         .single()
 
       if (error || !data) { setNotFound(true); setLoading(false); return }

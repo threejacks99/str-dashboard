@@ -118,6 +118,7 @@ export default function PropertiesPage() {
     const { data: properties } = await supabase
       .from('properties')
       .select('id, name, address, bedrooms, bathrooms, geocoded_at')
+      .is('deleted_at', null)
       .order('name')
 
     setProperties(properties ?? [])
@@ -133,6 +134,7 @@ export default function PropertiesPage() {
       .from('properties')
       .select('id, name, address, bedrooms, bathrooms, geocoded_at')
       .eq('id', result.id)
+      .is('deleted_at', null)
       .single()
     if (data) {
       setProperties(prev => [...prev, data as Property].sort((a, b) => a.name.localeCompare(b.name)))

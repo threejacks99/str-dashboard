@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     .from('properties')
     .select('id')
     .eq('id', propertyId)
+    .is('deleted_at', null)
     .single()
 
   if (propError || !property) {

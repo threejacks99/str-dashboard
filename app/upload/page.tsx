@@ -216,7 +216,7 @@ export default function UploadPage() {
   // ── Data loading ─────────────────────────────────────────────────────────────
   async function loadProperties() {
     const [propertiesRes, clientsRes] = await Promise.all([
-      supabase.from('properties').select('id, name').order('name'),
+      supabase.from('properties').select('id, name').is('deleted_at', null).order('name'),
       supabase.from('clients').select('id').order('created_at', { ascending: true }).limit(1),
     ])
     const props = propertiesRes.data ?? []
@@ -317,7 +317,7 @@ export default function UploadPage() {
   async function handlePropertyCreated(result?: { id: string; name: string }) {
     if (!result) return
     setShowCreateForm(false)
-    const { data } = await supabase.from('properties').select('id, name').order('name')
+    const { data } = await supabase.from('properties').select('id, name').is('deleted_at', null).order('name')
     setProperties(data ?? [])
     handlePropertySelect(result.id)
   }

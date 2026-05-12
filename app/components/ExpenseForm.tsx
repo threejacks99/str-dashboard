@@ -70,7 +70,7 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.from('properties').select('id, name').order('name').then(({ data, error }) => {
+    supabase.from('properties').select('id, name').is('deleted_at', null).order('name').then(({ data, error }) => {
       if (error) console.error('Failed to load properties:', error)
       const props = data ?? []
       setProperties(props)

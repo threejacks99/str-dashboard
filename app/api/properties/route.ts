@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
     const { count } = await supabase
       .from('properties')
       .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
 
     const currentCount = count ?? 0
     if (currentCount >= cap) {
