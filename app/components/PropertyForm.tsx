@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { useBillingStatus } from '../../lib/useBillingStatus'
+import { PORTFOLIO_OVERAGE_RATE, TIER_PROPERTY_CAPS, type Tier, type BillingInterval } from '../../lib/billing'
 import BillingLockScreen from './BillingLockScreen'
 import Modal from './Modal'
 
@@ -98,6 +100,100 @@ function Banner({
   )
 }
 
+// ── Delete confirmation body (edit mode) ─────────────────────────────────────
+function DeleteConfirmBody({
+  info,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  info: {
+    propertyName: string
+    tier: Tier
+    interval: BillingInterval | null
+    currentCount: number
+    newQty: number
+    overageExists: boolean
+  }
+  deleting: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const { propertyName, tier, interval, currentCount, newQty, overageExists } = info
+  const showOverage = tier === 'portfolio' && overageExists && !!interval
+
+  let overageText: string | null = null
+  if (showOverage && interval) {
+    const rate = PORTFOLIO_OVERAGE_RATE[interval]
+    const currentQty = currentCount - TIER_PROPERTY_CAPS.portfolio
+    const intervalText = interval === 'monthly' ? 'month' : 'year'
+
+    if (newQty === 0) {
+      const savings = currentQty * rate
+      overageText = `Your Portfolio overage will be removed entirely at next renewal — a savings of $${savings}/${intervalText}.`
+    } else {
+      const savings = (currentQty - newQty) * rate
+      const propText = newQty === 1 ? 'property' : 'properties'
+      overageText = `Your Portfolio overage will decrease from ${currentQty} to ${newQty} additional ${propText} at next renewal — a savings of $${savings}/${intervalText}.`
+    }
+  }
+
+  const baseText = showOverage
+    ? `This will hide ${propertyName} from your dashboards and reservation/expense forms. Your historical reports will continue to include it.`
+    : `This will hide ${propertyName} from your dashboards and reservation/expense forms. Your historical reports will continue to include it. This action cannot be undone from the app.`
+
+  return (
+    <>
+      <p style={{ fontSize: '14px', color: '#0D2C54', lineHeight: 1.5, marginTop: 0 }}>
+        {baseText}
+      </p>
+      {overageText && (
+        <p style={{ fontSize: '14px', color: '#0D2C54', lineHeight: 1.5, marginTop: '12px' }}>
+          {overageText}
+        </p>
+      )}
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={deleting}
+          style={{
+            fontSize: '14px',
+            color: '#888',
+            background: 'none',
+            border: 'none',
+            cursor: deleting ? 'not-allowed' : 'pointer',
+            fontFamily: 'Raleway, sans-serif',
+            padding: 0,
+            opacity: deleting ? 0.5 : 1,
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={deleting}
+          style={{
+            padding: '12px 32px',
+            background: deleting ? '#fca5a5' : '#DC2626',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '15px',
+            fontWeight: '700',
+            fontFamily: 'Raleway, sans-serif',
+            cursor: deleting ? 'not-allowed' : 'pointer',
+            transition: 'background 0.15s ease',
+          }}
+        >
+          {deleting ? 'Deleting…' : 'Delete property'}
+        </button>
+      </div>
+    </>
+  )
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface PropertyFormInitialValues {
   name?: string
@@ -129,7 +225,7 @@ export default function PropertyForm({
   onSuccess,
   onCancel,
 }: PropertyFormProps) {
-  const { isLocked } = useBillingStatus()
+  const { isLocked, status } = useBillingStatus()
   const [name, setName]                   = useState(initialValues?.name ?? '')
   const [address, setAddress]             = useState(initialValues?.address ?? '')
   const [bedrooms, setBedrooms]           = useState(initialValues?.bedrooms ?? '')
@@ -154,6 +250,19 @@ export default function PropertyForm({
     interval: 'monthly' | 'annual'
   } | null>(null)
   const [pendingPayload, setPendingPayload] = useState<any>(null)
+
+  const router = useRouter()
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    propertyName: string
+    tier: Tier
+    interval: BillingInterval | null
+    currentCount: number
+    newQty: number
+    overageExists: boolean
+  } | null>(null)
+
+  const [deleting, setDeleting] = useState(false)
 
   async function runGeocode(addr: string, id: string): Promise<boolean> {
     setGeocoding(true)
@@ -283,6 +392,75 @@ export default function PropertyForm({
 
       onSuccess({ id: propertyId!, name: name.trim() })
     }
+  }
+
+  async function openDeleteConfirm() {
+    // Fetch current active count for cap math display.
+    const { count } = await supabase
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
+
+    const currentCount = count ?? 0
+    const newCount = currentCount - 1
+
+    const tier = status?.subscription_tier
+    const interval = status?.billing_interval ?? null
+    // Client can't see Stripe items, so we infer overage existence from the
+    // count: Phase 8 guarantees count > 10 on Portfolio implies an overage
+    // item exists.
+    const overageExists = tier === 'portfolio' && currentCount > TIER_PROPERTY_CAPS.portfolio
+    const newQty = tier === 'portfolio'
+      ? Math.max(0, newCount - TIER_PROPERTY_CAPS.portfolio)
+      : 0
+
+    setDeleteConfirm({
+      propertyName: name.trim() || 'this property',
+      tier: tier!,
+      interval,
+      currentCount,
+      newQty,
+      overageExists,
+    })
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteConfirm || !propertyId) return
+    setDeleting(true)
+
+    let res: Response
+    try {
+      res = await fetch(`/api/properties/${propertyId}`, {
+        method: 'DELETE',
+      })
+    } catch (err: any) {
+      setDeleting(false)
+      setBanner({
+        type: 'error',
+        message: err?.message ?? 'Network error. Please try again.',
+      })
+      setDeleteConfirm(null)
+      return
+    }
+
+    const result = await res.json().catch(() => ({}))
+    setDeleting(false)
+
+    if (!res.ok) {
+      setBanner({
+        type: 'error',
+        message: result?.error ?? `Delete failed (${res.status})`,
+      })
+      setDeleteConfirm(null)
+      return
+    }
+
+    // Success — close modal and navigate. router.push + refresh re-mounts the
+    // grid page and re-runs its load() effect; the soft-deleted row won't
+    // appear because Commit 1 added the deleted_at filter.
+    setDeleteConfirm(null)
+    router.push('/properties')
+    router.refresh()
   }
 
   const busy = saving || geocoding
@@ -499,6 +677,28 @@ export default function PropertyForm({
             Cancel
           </button>
         )}
+        {mode === 'edit' && (
+          <button
+            type="button"
+            onClick={openDeleteConfirm}
+            disabled={busy || deleting}
+            style={{
+              marginLeft: 'auto',
+              padding: '10px 18px',
+              background: 'none',
+              border: '1px solid #DC2626',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#DC2626',
+              fontFamily: 'Raleway, sans-serif',
+              cursor: (busy || deleting) ? 'not-allowed' : 'pointer',
+              opacity: (busy || deleting) ? 0.5 : 1,
+            }}
+          >
+            Delete Property
+          </button>
+        )}
       </div>
     </form>
 
@@ -554,6 +754,21 @@ export default function PropertyForm({
             Add property (+${overageConfirm.rate}/{overageConfirm.interval === 'monthly' ? 'mo' : 'yr'})
           </button>
         </div>
+      </Modal>
+    )}
+
+    {deleteConfirm && (
+      <Modal
+        isOpen={true}
+        onClose={() => setDeleteConfirm(null)}
+        title={`Delete ${deleteConfirm.propertyName}?`}
+      >
+        <DeleteConfirmBody
+          info={deleteConfirm}
+          deleting={deleting}
+          onCancel={() => setDeleteConfirm(null)}
+          onConfirm={handleConfirmDelete}
+        />
       </Modal>
     )}
     </>
