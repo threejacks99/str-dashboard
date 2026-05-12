@@ -194,11 +194,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
-
-// TODO: Phase 8b — delete-side overage decrement.
-// Build DELETE /api/properties/[id] that:
-//   1. deletes the property (with cascade behavior decided then)
-//   2. on Portfolio, recomputes overage quantity = max(0, count - 10)
-//   3. calls stripe.subscriptions.update with proration_behavior: 'none'
-//   4. removes the overage item entirely (items: [{ id, deleted: true }])
-//      when quantity would drop to 0.
