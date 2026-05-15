@@ -248,7 +248,8 @@ export default function ReservationForm({
         setBanner({ type: 'error', message: `Save failed: ${error.message}` })
         return
       }
-      setBanner({ type: 'success', message: 'Reservation saved successfully.' })
+      // No success banner — onSuccess navigates immediately, so the banner
+      // would flash for a fraction of a second and read as a UI bug.
       onSuccess()
       return
     }
