@@ -8,7 +8,26 @@ import BillingLockScreen from './BillingLockScreen'
 
 interface Property { id: string; name: string }
 
+export interface ReservationFormInitialValues {
+  propertyId?: string
+  reservationRef?: string
+  guestName?: string
+  bookingSource?: string
+  checkIn?: string
+  checkOut?: string
+  adultGuests?: string
+  childGuests?: string
+  grossRent?: string
+  mgmtFee?: string
+  ownerPayout?: string
+  bookingCreatedAt?: string
+  status?: string
+}
+
 interface Props {
+  mode?: 'create' | 'edit'
+  reservationId?: string  // required for edit
+  initialValues?: ReservationFormInitialValues
   onSuccess: () => void
   onCancel: () => void
 }
@@ -70,40 +89,97 @@ function Req() {
   return <span style={{ color: '#FF7767' }}>*</span>
 }
 
-export default function ReservationForm({ onSuccess, onCancel }: Props) {
+// Banner for edit-mode save success/error (mirrors PropertyForm).
+function Banner({
+  type,
+  message,
+  onDismiss,
+}: {
+  type: 'success' | 'error'
+  message: string
+  onDismiss: () => void
+}) {
+  useEffect(() => {
+    if (type === 'success') {
+      const t = setTimeout(onDismiss, 4000)
+      return () => clearTimeout(t)
+    }
+  }, [type, onDismiss])
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      fontSize: '14px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '12px',
+      background: type === 'success' ? '#F0FFF8' : '#FFF0EE',
+      border: `1px solid ${type === 'success' ? '#A8E6C3' : '#FFCDC7'}`,
+      color: type === 'success' ? '#1A6E47' : '#B83224',
+    }}>
+      <span>{message}</span>
+      <button
+        onClick={onDismiss}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'inherit', lineHeight: 1, padding: 0 }}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+export default function ReservationForm({
+  mode = 'create',
+  reservationId,
+  initialValues,
+  onSuccess,
+  onCancel,
+}: Props) {
   const { isLocked } = useBillingStatus()
   const [properties, setProperties] = useState<Property[]>([])
   const [propsLoading, setPropsLoading] = useState(true)
 
-  const [propertyId, setPropertyId] = useState('')
-  const [reservationRef, setReservationRef] = useState('')
-  const [guestName, setGuestName] = useState('')
-  const [bookingSource, setBookingSource] = useState('Airbnb')
-  const [checkIn, setCheckIn] = useState('')
-  const [checkOut, setCheckOut] = useState('')
-  const [adultGuests, setAdultGuests] = useState('1')
-  const [childGuests, setChildGuests] = useState('0')
-  const [grossRent, setGrossRent] = useState('')
-  const [mgmtFee, setMgmtFee] = useState('')
-  const [ownerPayout, setOwnerPayout] = useState('')
-  const [payoutEdited, setPayoutEdited] = useState(false)
-  const [bookingCreatedAt, setBookingCreatedAt] = useState(today())
-  const [status, setStatus] = useState('Confirmed')
+  const [propertyId, setPropertyId]             = useState(initialValues?.propertyId ?? '')
+  const [reservationRef, setReservationRef]     = useState(initialValues?.reservationRef ?? '')
+  const [guestName, setGuestName]               = useState(initialValues?.guestName ?? '')
+  const [bookingSource, setBookingSource]       = useState(initialValues?.bookingSource ?? 'Airbnb')
+  const [checkIn, setCheckIn]                   = useState(initialValues?.checkIn ?? '')
+  const [checkOut, setCheckOut]                 = useState(initialValues?.checkOut ?? '')
+  const [adultGuests, setAdultGuests]           = useState(initialValues?.adultGuests ?? '1')
+  const [childGuests, setChildGuests]           = useState(initialValues?.childGuests ?? '0')
+  const [grossRent, setGrossRent]               = useState(initialValues?.grossRent ?? '')
+  const [mgmtFee, setMgmtFee]                   = useState(initialValues?.mgmtFee ?? '')
+  const [ownerPayout, setOwnerPayout]           = useState(initialValues?.ownerPayout ?? '')
+  // In edit mode, treat the loaded payout as user-edited so the auto-calc
+  // effect doesn't clobber it on first render.
+  const [payoutEdited, setPayoutEdited]         = useState(mode === 'edit')
+  const [bookingCreatedAt, setBookingCreatedAt] = useState(initialValues?.bookingCreatedAt ?? today())
+  const [status, setStatus]                     = useState(initialValues?.status ?? 'Confirmed')
 
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [errors, setErrors]       = useState<Record<string, string>>({})
+  const [saving, setSaving]       = useState(false)
+  const [saved, setSaved]         = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [banner, setBanner]       = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
-    supabase.from('properties').select('id, name').is('deleted_at', null).order('name').then(({ data, error }) => {
+    // In edit mode, don't filter out soft-deleted properties — the existing
+    // reservation may already point to one, and the dropdown needs to render
+    // it as the current selection.
+    const q = mode === 'edit'
+      ? supabase.from('properties').select('id, name').order('name')
+      : supabase.from('properties').select('id, name').is('deleted_at', null).order('name')
+    q.then(({ data, error }) => {
       if (error) console.error('Failed to load properties:', error)
       const props = data ?? []
       setProperties(props)
-      if (props.length === 1) setPropertyId(props[0].id)
+      if (mode === 'create' && props.length === 1) setPropertyId(props[0].id)
       setPropsLoading(false)
     })
-  }, [])
+  }, [mode])
 
   const nights = calcNights(checkIn, checkOut)
   const grossRentNum = parseCurrency(grossRent)
@@ -136,6 +212,7 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
     if (!validate()) return
     setSaving(true)
     setSaveError(null)
+    setBanner(null)
 
     const payload = {
       property_id: propertyId,
@@ -152,6 +229,21 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
       owner_payout: parseCurrency(ownerPayout),
       booking_created_at: bookingCreatedAt ? `${bookingCreatedAt}T00:00:00.000Z` : null,
       status: sanitizeString(status) ?? status,
+    }
+
+    if (mode === 'edit') {
+      const { error } = await supabase
+        .from('reservations')
+        .update(payload)
+        .eq('id', reservationId!)
+      setSaving(false)
+      if (error) {
+        setBanner({ type: 'error', message: `Save failed: ${error.message}` })
+        return
+      }
+      setBanner({ type: 'success', message: 'Reservation saved successfully.' })
+      onSuccess()
+      return
     }
 
     console.log('[ReservationForm] Inserting:', payload)
@@ -175,7 +267,7 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
 
   if (isLocked) return <BillingLockScreen />
 
-  if (properties.length === 0) {
+  if (mode === 'create' && properties.length === 0) {
     return (
       <div style={{ padding: '24px', textAlign: 'center' }}>
         <p style={{ color: '#888', fontSize: '14px', marginBottom: '16px' }}>
@@ -190,7 +282,7 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
     )
   }
 
-  if (saved) {
+  if (mode === 'create' && saved) {
     return (
       <div style={{ padding: '32px', textAlign: 'center' }}>
         <div style={{ fontSize: '40px', marginBottom: '12px' }}>✓</div>
@@ -204,6 +296,10 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} style={{ fontFamily: 'Raleway, sans-serif' }}>
+      {mode === 'edit' && banner && (
+        <Banner type={banner.type} message={banner.message} onDismiss={() => setBanner(null)} />
+      )}
+
       {saveError && (
         <div style={{
           background: '#FFF0EE', border: '1px solid #FFCDC7', borderRadius: '8px',
@@ -217,7 +313,7 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
       {/* Property */}
       <div style={{ marginBottom: '16px' }}>
         <label style={labelStyle}>Property <Req /></label>
-        {properties.length === 1 ? (
+        {mode === 'create' && properties.length === 1 ? (
           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0D2C54', padding: '10px 0' }}>
             {properties[0].name}
           </div>
@@ -362,7 +458,7 @@ export default function ReservationForm({ onSuccess, onCancel }: Props) {
             transition: 'background 0.15s ease',
           }}
         >
-          {saving ? 'Saving…' : 'Save Reservation'}
+          {saving ? 'Saving…' : mode === 'edit' ? 'Save Changes' : 'Save Reservation'}
         </button>
         <button
           type="button"

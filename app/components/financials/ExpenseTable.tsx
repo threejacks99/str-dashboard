@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { Edit2 } from 'lucide-react'
 
 export interface ExpenseRow {
   id: string
@@ -115,13 +117,14 @@ export default function ExpenseTable({ expenses }: Props) {
               <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => handleSort('amount')}>
                 Amount<SortIcon col="amount" />
               </th>
+              <th style={{ ...thStyle, cursor: 'default', width: '40px' }} aria-label="Edit" />
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   style={{
                     padding: '32px',
                     textAlign: 'center',
@@ -198,6 +201,19 @@ export default function ExpenseTable({ expenses }: Props) {
                   fontVariantNumeric: 'tabular-nums',
                 }}>
                   {fmtAmount(e.amount)}
+                </td>
+                <td style={{
+                  padding: '11px 16px',
+                  borderBottom: '1px solid #f5f5f5',
+                  textAlign: 'center',
+                }}>
+                  <Link
+                    href={`/expenses/${e.id}`}
+                    aria-label="Edit expense"
+                    style={{ color: '#888', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    <Edit2 size={16} />
+                  </Link>
                 </td>
               </tr>
             ))}

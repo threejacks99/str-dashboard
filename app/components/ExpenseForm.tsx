@@ -8,7 +8,20 @@ import BillingLockScreen from './BillingLockScreen'
 
 interface Property { id: string; name: string }
 
+export interface ExpenseFormInitialValues {
+  propertyId?: string
+  paidDate?: string
+  vendor?: string
+  description?: string
+  amount?: string
+  category?: string
+  frequency?: string
+}
+
 interface Props {
+  mode?: 'create' | 'edit'
+  expenseId?: string  // required for edit
+  initialValues?: ExpenseFormInitialValues
   onSuccess: () => void
   onCancel: () => void
 }
@@ -51,33 +64,88 @@ const CATEGORIES = [
   'Fees', 'Professional Services', 'Software', 'Other',
 ]
 
-export default function ExpenseForm({ onSuccess, onCancel }: Props) {
+// Banner for edit-mode save success/error (mirrors PropertyForm).
+function Banner({
+  type,
+  message,
+  onDismiss,
+}: {
+  type: 'success' | 'error'
+  message: string
+  onDismiss: () => void
+}) {
+  useEffect(() => {
+    if (type === 'success') {
+      const t = setTimeout(onDismiss, 4000)
+      return () => clearTimeout(t)
+    }
+  }, [type, onDismiss])
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      fontSize: '14px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '12px',
+      background: type === 'success' ? '#F0FFF8' : '#FFF0EE',
+      border: `1px solid ${type === 'success' ? '#A8E6C3' : '#FFCDC7'}`,
+      color: type === 'success' ? '#1A6E47' : '#B83224',
+    }}>
+      <span>{message}</span>
+      <button
+        onClick={onDismiss}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'inherit', lineHeight: 1, padding: 0 }}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+export default function ExpenseForm({
+  mode = 'create',
+  expenseId,
+  initialValues,
+  onSuccess,
+  onCancel,
+}: Props) {
   const { isLocked } = useBillingStatus()
   const [properties, setProperties] = useState<Property[]>([])
   const [propsLoading, setPropsLoading] = useState(true)
 
-  const [propertyId, setPropertyId] = useState('')
-  const [paidDate, setPaidDate] = useState(today())
-  const [vendor, setVendor] = useState('')
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState('Maintenance')
-  const [frequency, setFrequency] = useState('One-time')
+  const [propertyId, setPropertyId]   = useState(initialValues?.propertyId ?? '')
+  const [paidDate, setPaidDate]       = useState(initialValues?.paidDate ?? today())
+  const [vendor, setVendor]           = useState(initialValues?.vendor ?? '')
+  const [description, setDescription] = useState(initialValues?.description ?? '')
+  const [amount, setAmount]           = useState(initialValues?.amount ?? '')
+  const [category, setCategory]       = useState(initialValues?.category ?? 'Maintenance')
+  const [frequency, setFrequency]     = useState(initialValues?.frequency ?? 'One-time')
 
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [errors, setErrors]       = useState<Record<string, string>>({})
+  const [saving, setSaving]       = useState(false)
+  const [saved, setSaved]         = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [banner, setBanner]       = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
-    supabase.from('properties').select('id, name').is('deleted_at', null).order('name').then(({ data, error }) => {
+    // In edit mode, don't filter out soft-deleted properties — the existing
+    // expense may already point to one, and the dropdown needs to render
+    // it as the current selection.
+    const q = mode === 'edit'
+      ? supabase.from('properties').select('id, name').order('name')
+      : supabase.from('properties').select('id, name').is('deleted_at', null).order('name')
+    q.then(({ data, error }) => {
       if (error) console.error('Failed to load properties:', error)
       const props = data ?? []
       setProperties(props)
-      if (props.length === 1) setPropertyId(props[0].id)
+      if (mode === 'create' && props.length === 1) setPropertyId(props[0].id)
       setPropsLoading(false)
     })
-  }, [])
+  }, [mode])
 
   function validate(): boolean {
     const errs: Record<string, string> = {}
@@ -94,6 +162,7 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
     if (!validate()) return
     setSaving(true)
     setSaveError(null)
+    setBanner(null)
 
     const payload = {
       property_id: propertyId,
@@ -103,6 +172,21 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
       amount: parseCurrency(amount),
       category: sanitizeString(category) ?? category,
       frequency: sanitizeString(frequency) ?? frequency,
+    }
+
+    if (mode === 'edit') {
+      const { error } = await supabase
+        .from('expenses')
+        .update(payload)
+        .eq('id', expenseId!)
+      setSaving(false)
+      if (error) {
+        setBanner({ type: 'error', message: `Save failed: ${error.message}` })
+        return
+      }
+      setBanner({ type: 'success', message: 'Expense saved successfully.' })
+      onSuccess()
+      return
     }
 
     console.log('[ExpenseForm] Inserting:', payload)
@@ -126,7 +210,7 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
     return <div style={{ padding: '24px', textAlign: 'center', color: '#888', fontSize: '14px' }}>Loading…</div>
   }
 
-  if (properties.length === 0) {
+  if (mode === 'create' && properties.length === 0) {
     return (
       <div style={{ padding: '24px', textAlign: 'center' }}>
         <p style={{ color: '#888', fontSize: '14px', marginBottom: '16px' }}>
@@ -141,7 +225,7 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
     )
   }
 
-  if (saved) {
+  if (mode === 'create' && saved) {
     return (
       <div style={{ padding: '24px', textAlign: 'center' }}>
         <div style={{ fontSize: '36px', marginBottom: '12px' }}>✓</div>
@@ -152,6 +236,10 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} style={{ fontFamily: 'Raleway, sans-serif' }}>
+      {mode === 'edit' && banner && (
+        <Banner type={banner.type} message={banner.message} onDismiss={() => setBanner(null)} />
+      )}
+
       {saveError && (
         <div style={{
           background: '#FFF0EE', border: '1px solid #FFCDC7', borderRadius: '8px',
@@ -165,7 +253,7 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
       {/* Property */}
       <div style={{ marginBottom: '16px' }}>
         <label style={labelStyle}>Property <Req /></label>
-        {properties.length === 1 ? (
+        {mode === 'create' && properties.length === 1 ? (
           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0D2C54', padding: '10px 0' }}>
             {properties[0].name}
           </div>
@@ -243,7 +331,7 @@ export default function ExpenseForm({ onSuccess, onCancel }: Props) {
             transition: 'background 0.15s ease',
           }}
         >
-          {saving ? 'Saving…' : 'Save Expense'}
+          {saving ? 'Saving…' : mode === 'edit' ? 'Save Changes' : 'Save Expense'}
         </button>
         <button
           type="button"

@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import { Edit2 } from 'lucide-react'
 import Tooltip from '../Tooltip'
 import { METRIC_DEFS } from '../../../lib/metricDefinitions'
 
@@ -247,12 +249,13 @@ export default function ReservationsTable({ reservations }: Props) {
               <th style={{ ...thBase, textAlign: 'left' }} onClick={() => handleSort('status')}>
                 Status<SortIcon col="status" />
               </th>
+              <th style={{ ...thBase, cursor: 'default', width: '40px' }} aria-label="Edit" />
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={8} style={{
+                <td colSpan={9} style={{
                   padding: '40px',
                   textAlign: 'center',
                   color: '#aaa',
@@ -342,6 +345,19 @@ export default function ReservationsTable({ reservations }: Props) {
                   borderBottom: '1px solid #f5f5f5',
                 }}>
                   <StatusBadge status={r.status} />
+                </td>
+                <td style={{
+                  padding: '11px 14px',
+                  borderBottom: '1px solid #f5f5f5',
+                  textAlign: 'center',
+                }}>
+                  <Link
+                    href={`/reservations/${r.id}`}
+                    aria-label="Edit reservation"
+                    style={{ color: '#888', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    <Edit2 size={16} />
+                  </Link>
                 </td>
               </tr>
             ))}
