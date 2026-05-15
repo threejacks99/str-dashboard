@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { sanitizeString } from '../../lib/csvMapper'
 import { useBillingStatus } from '../../lib/useBillingStatus'
 import BillingLockScreen from './BillingLockScreen'
+import Modal from './Modal'
 
 interface Property { id: string; name: string }
 
@@ -165,6 +167,11 @@ export default function ReservationForm({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [banner, setBanner]       = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+
+  const router = useRouter()
+
   useEffect(() => {
     // In edit mode, don't filter out soft-deleted properties — the existing
     // reservation may already point to one, and the dropdown needs to render
@@ -261,6 +268,38 @@ export default function ReservationForm({
     setTimeout(() => onSuccess(), 1500)
   }
 
+  function openDeleteConfirm() {
+    setDeleteConfirm(true)
+  }
+
+  async function handleConfirmDelete() {
+    if (!reservationId) return
+    setDeleting(true)
+
+    let res: Response
+    try {
+      res = await fetch(`/api/reservations/${reservationId}`, { method: 'DELETE' })
+    } catch (err: any) {
+      setDeleting(false)
+      setBanner({ type: 'error', message: err?.message ?? 'Network error. Please try again.' })
+      setDeleteConfirm(false)
+      return
+    }
+
+    const result = await res.json().catch(() => ({}))
+    setDeleting(false)
+
+    if (!res.ok) {
+      setBanner({ type: 'error', message: result?.error ?? `Delete failed (${res.status})` })
+      setDeleteConfirm(false)
+      return
+    }
+
+    setDeleteConfirm(false)
+    router.push('/bookings')
+    router.refresh()
+  }
+
   if (propsLoading) {
     return <div style={{ padding: '24px', textAlign: 'center', color: '#888', fontSize: '14px' }}>Loading…</div>
   }
@@ -295,6 +334,7 @@ export default function ReservationForm({
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} style={{ fontFamily: 'Raleway, sans-serif' }}>
       {mode === 'edit' && banner && (
         <Banner type={banner.type} message={banner.message} onDismiss={() => setBanner(null)} />
@@ -471,7 +511,80 @@ export default function ReservationForm({
         >
           Cancel
         </button>
+        {mode === 'edit' && (
+          <button
+            type="button"
+            onClick={openDeleteConfirm}
+            disabled={saving || deleting}
+            style={{
+              marginLeft: 'auto',
+              padding: '10px 18px',
+              background: 'none',
+              border: '1px solid #DC2626',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#DC2626',
+              fontFamily: 'Raleway, sans-serif',
+              cursor: (saving || deleting) ? 'not-allowed' : 'pointer',
+              opacity: (saving || deleting) ? 0.5 : 1,
+            }}
+          >
+            Delete reservation
+          </button>
+        )}
       </div>
     </form>
+
+    {deleteConfirm && (
+      <Modal
+        isOpen={true}
+        onClose={() => setDeleteConfirm(false)}
+        title="Delete this reservation?"
+      >
+        <p style={{ fontSize: '14px', color: '#0D2C54', lineHeight: 1.5, marginTop: 0 }}>
+          This cannot be undone.
+        </p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setDeleteConfirm(false)}
+            disabled={deleting}
+            style={{
+              fontSize: '14px',
+              color: '#888',
+              background: 'none',
+              border: 'none',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              fontFamily: 'Raleway, sans-serif',
+              padding: 0,
+              opacity: deleting ? 0.5 : 1,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmDelete}
+            disabled={deleting}
+            style={{
+              padding: '12px 32px',
+              background: deleting ? '#fca5a5' : '#DC2626',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: '700',
+              fontFamily: 'Raleway, sans-serif',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </Modal>
+    )}
+    </>
   )
 }
