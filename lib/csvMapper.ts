@@ -8,8 +8,11 @@
 //   - Any code point outside printable ASCII (0x20-0x7E)
 //   - Leading and trailing whitespace
 //
-// The database layer mirrors this via CHECK constraints on the same columns,
-// so any row that somehow bypasses the application layer is rejected at insert.
+// The database layer mirrors this via CHECK constraints on the free-text
+// columns of reservations, expenses, properties, clients, and uploads, so
+// any row that somehow bypasses the application layer is rejected at insert.
+// (See supabase/migrations/0003_phase11_properties_clients_uploads_ascii.sql
+// for the extension to properties, clients, and uploads on May 19, 2026.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function sanitizeString(value: string | null | undefined): string | null {
