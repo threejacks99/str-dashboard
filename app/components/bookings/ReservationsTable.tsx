@@ -8,6 +8,8 @@ import { METRIC_DEFS } from '../../../lib/metricDefinitions'
 
 export interface Reservation {
   id: string
+  property_id: string | null
+  property_name: string | null
   guest_name: string | null
   check_in: string | null
   check_out: string | null
@@ -73,7 +75,7 @@ function StatusBadge({ status }: { status: string | null }) {
   )
 }
 
-type SortKey = 'guest_name' | 'check_in' | 'check_out' | 'nights' | 'booking_source' | 'gross_rent' | 'owner_payout' | 'status'
+type SortKey = 'property_name' | 'guest_name' | 'check_in' | 'check_out' | 'nights' | 'booking_source' | 'gross_rent' | 'owner_payout' | 'status'
 type SortDir = 'asc' | 'desc'
 type FilterTab = 'all' | 'upcoming' | 'past' | 'cancelled'
 
@@ -86,6 +88,11 @@ export default function ReservationsTable({ reservations }: Props) {
   const [tab, setTab]         = useState<FilterTab>('all')
 
   const today = new Date().toISOString().slice(0, 10)
+
+  const showPropertyColumn = useMemo(
+    () => new Set(reservations.map(r => r.property_id).filter(Boolean)).size > 1,
+    [reservations]
+  )
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -219,6 +226,11 @@ export default function ReservationsTable({ reservations }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              {showPropertyColumn && (
+                <th style={{ ...thBase, textAlign: 'left' }} onClick={() => handleSort('property_name')}>
+                  Property<SortIcon col="property_name" />
+                </th>
+              )}
               <th style={{ ...thBase, textAlign: 'left' }} onClick={() => handleSort('guest_name')}>
                 Guest<SortIcon col="guest_name" />
               </th>
@@ -255,7 +267,7 @@ export default function ReservationsTable({ reservations }: Props) {
           <tbody>
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={9} style={{
+                <td colSpan={showPropertyColumn ? 10 : 9} style={{
                   padding: '40px',
                   textAlign: 'center',
                   color: '#aaa',
@@ -268,6 +280,18 @@ export default function ReservationsTable({ reservations }: Props) {
             )}
             {sorted.map((r, i) => (
               <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFC' }}>
+                {showPropertyColumn && (
+                  <td style={{
+                    padding: '11px 14px',
+                    fontSize: '13px',
+                    color: '#555',
+                    fontFamily: 'Raleway, sans-serif',
+                    borderBottom: '1px solid #f5f5f5',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {r.property_name ?? '—'}
+                  </td>
+                )}
                 <td style={{
                   padding: '11px 14px',
                   fontSize: '13px',

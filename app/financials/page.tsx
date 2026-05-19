@@ -200,7 +200,7 @@ export default async function FinancialsPage({
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('id, name')
+    .select('id, name, deleted_at')
     .in('client_id', clientIds)
     .order('name')
 
@@ -294,9 +294,17 @@ export default async function FinancialsPage({
   }))
 
   // ── Recent expenses ───────────────────────────────────────────────────────
+  const propertyNameMap: Record<string, string> = {}
+  for (const p of (properties ?? []) as any[]) {
+    propertyNameMap[p.id] = p.deleted_at ? `${p.name} (deleted)` : p.name
+  }
   const recentExpenses = [...(expenses ?? [])]
     .sort((a: any, b: any) => (b.paid_date ?? '').localeCompare(a.paid_date ?? ''))
     .slice(0, 50)
+    .map((e: any) => ({
+      ...e,
+      property_name: e.property_id ? (propertyNameMap[e.property_id] ?? null) : null,
+    }))
 
   return (
     <div>

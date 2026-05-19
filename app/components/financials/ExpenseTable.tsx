@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Edit2 } from 'lucide-react'
 
 export interface ExpenseRow {
   id: string
+  property_id: string | null
+  property_name: string | null
   paid_date: string | null
   vendor: string | null
   description: string | null
@@ -17,7 +19,7 @@ interface Props {
   expenses: ExpenseRow[]
 }
 
-type SortKey = 'paid_date' | 'vendor' | 'description' | 'category' | 'amount'
+type SortKey = 'property_name' | 'paid_date' | 'vendor' | 'description' | 'category' | 'amount'
 type SortDir = 'asc' | 'desc'
 
 function fmtDate(s: string | null): string {
@@ -37,6 +39,11 @@ const CORAL = '#FF7767'
 export default function ExpenseTable({ expenses }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('paid_date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  const showPropertyColumn = useMemo(
+    () => new Set(expenses.map(e => e.property_id).filter(Boolean)).size > 1,
+    [expenses]
+  )
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -102,6 +109,11 @@ export default function ExpenseTable({ expenses }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              {showPropertyColumn && (
+                <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('property_name')}>
+                  Property<SortIcon col="property_name" />
+                </th>
+              )}
               <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('paid_date')}>
                 Date<SortIcon col="paid_date" />
               </th>
@@ -124,7 +136,7 @@ export default function ExpenseTable({ expenses }: Props) {
             {sorted.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={showPropertyColumn ? 7 : 6}
                   style={{
                     padding: '32px',
                     textAlign: 'center',
@@ -142,6 +154,18 @@ export default function ExpenseTable({ expenses }: Props) {
                 key={e.id}
                 style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFC' }}
               >
+                {showPropertyColumn && (
+                  <td style={{
+                    padding: '11px 16px',
+                    fontSize: '13px',
+                    color: '#555',
+                    fontFamily: 'Raleway, sans-serif',
+                    borderBottom: '1px solid #f5f5f5',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {e.property_name ?? '—'}
+                  </td>
+                )}
                 <td style={{
                   padding: '11px 16px',
                   fontSize: '13px',

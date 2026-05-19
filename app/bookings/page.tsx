@@ -188,7 +188,7 @@ export default async function BookingsPage({
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('id, name')
+    .select('id, name, deleted_at')
     .in('client_id', clientIds)
     .order('name')
 
@@ -287,10 +287,16 @@ export default async function BookingsPage({
   const bookingsByDay = DAYS.map(day => ({ day: day.slice(0, 3), count: dayCountMap[day] }))
 
   // ── Reservations table ─────────────────────────────────────────────────────
+  const propertyNameMap: Record<string, string> = {}
+  for (const p of (properties ?? []) as any[]) {
+    propertyNameMap[p.id] = p.deleted_at ? `${p.name} (deleted)` : p.name
+  }
   const tableReservations = allRes
     .filter((r: any) => !isOwnerStay(r))
     .map((r: any) => ({
       id:             r.id,
+      property_id:    r.property_id ?? null,
+      property_name:  r.property_id ? (propertyNameMap[r.property_id] ?? null) : null,
       guest_name:     r.guest_name ?? null,
       check_in:       r.check_in ?? null,
       check_out:      r.check_out ?? null,
