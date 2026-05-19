@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds } from '../../lib/auth'
+import { isAccountLocked, type BillingStatus } from '../../lib/billing'
+import BillingLockScreen from '../components/BillingLockScreen'
 import KpiCards from '../components/dashboard/KpiCards'
 import type { PriorKpis } from '../components/dashboard/KpiCards'
 import RevenueChart from '../components/dashboard/RevenueChart'
@@ -181,7 +183,21 @@ export default async function DashboardPage({
 
   // ── Determine what this user can see ──────────────────────────────────────
   const userAccount = await getCurrentUserAccount()
-  const clientIds   = await getAccessibleClientIds(userAccount)
+
+  // ── Billing lock check ────────────────────────────────────────────────────
+  const accountId = userAccount[0]?.account_id
+  let billingStatus: BillingStatus | null = null
+  if (accountId) {
+    const { data } = await supabase
+      .from('accounts')
+      .select('subscription_tier, subscription_status, billing_interval, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id')
+      .eq('id', accountId)
+      .maybeSingle()
+    billingStatus = data as BillingStatus | null
+  }
+  if (isAccountLocked(billingStatus)) return <BillingLockScreen />
+
+  const clientIds = await getAccessibleClientIds(userAccount)
 
   if (!clientIds.length) return <EmptyState />
 

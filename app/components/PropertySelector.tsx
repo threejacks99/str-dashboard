@@ -7,9 +7,10 @@ import { supabase } from '../../lib/supabase'
 interface Property {
   id: string
   name: string
+  deleted_at: string | null
 }
 
-const ANALYTICS_PATHS = ['/', '/financials', '/bookings']
+const ANALYTICS_PATHS = ['/dashboard', '/financials', '/bookings']
 
 export default function PropertySelector() {
   const router       = useRouter()
@@ -24,7 +25,8 @@ export default function PropertySelector() {
   useEffect(() => {
     supabase
       .from('properties')
-      .select('id, name')
+      .select('id, name, deleted_at')
+      .order('deleted_at', { ascending: true, nullsFirst: true })
       .order('name')
       .then(({ data }) => {
         setProperties(data ?? [])
@@ -65,6 +67,8 @@ export default function PropertySelector() {
 
   // Single property — non-interactive label
   if (properties.length === 1) {
+    const onlyProp = properties[0]
+    const onlyDeleted = !!onlyProp.deleted_at
     return (
       <div style={{
         display: 'flex',
@@ -76,12 +80,12 @@ export default function PropertySelector() {
         borderRadius: '8px',
         fontSize: '13px',
         fontWeight: '600',
-        color: '#0D2C54',
+        color: onlyDeleted ? '#999' : '#0D2C54',
         fontFamily: 'Raleway, sans-serif',
         whiteSpace: 'nowrap',
       }}>
         <span style={{ fontSize: '14px', lineHeight: 1 }}>🏠</span>
-        <span>{properties[0].name}</span>
+        <span>{onlyProp.name}{onlyDeleted ? ' (deleted)' : ''}</span>
       </div>
     )
   }
@@ -89,8 +93,9 @@ export default function PropertySelector() {
   // Multi-property dropdown
   const effectiveParam      = currentParam && properties.some(p => p.id === currentParam) ? currentParam : 'all'
   const selectedProperty    = properties.find(p => p.id === effectiveParam)
+  const selectedDeleted     = !!selectedProperty?.deleted_at
   const buttonLabel         = selectedProperty
-    ? selectedProperty.name
+    ? `${selectedProperty.name}${selectedDeleted ? ' (deleted)' : ''}`
     : `All Properties (${properties.length})`
   const isActive = open
 
@@ -161,6 +166,8 @@ export default function PropertySelector() {
 
           {properties.map(prop => {
             const sel = effectiveParam === prop.id
+            const isDeleted = !!prop.deleted_at
+            const restingColor = sel ? '#FF7767' : (isDeleted ? '#999' : '#0D2C54')
             return (
               <button
                 key={prop.id}
@@ -169,14 +176,14 @@ export default function PropertySelector() {
                   display: 'block', width: '100%', padding: '10px 16px',
                   background: sel ? '#FFF5F4' : 'none', border: 'none', textAlign: 'left',
                   fontSize: '14px', fontWeight: sel ? '700' : '400',
-                  color: sel ? '#FF7767' : '#0D2C54',
+                  color: restingColor,
                   fontFamily: 'Raleway, sans-serif', cursor: 'pointer',
                 }}
                 onMouseEnter={e => { if (!sel) e.currentTarget.style.background = '#F9FAFB' }}
                 onMouseLeave={e => { e.currentTarget.style.background = sel ? '#FFF5F4' : 'none' }}
               >
                 <span style={{ marginRight: '8px', opacity: sel ? 1 : 0 }}>✓</span>
-                {prop.name}
+                {prop.name}{isDeleted ? ' (deleted)' : ''}
               </button>
             )
           })}
