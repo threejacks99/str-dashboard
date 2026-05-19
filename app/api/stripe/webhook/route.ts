@@ -142,23 +142,16 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
     return
   }
 
-  // Cancellation must never be blocked by a price-id lookup miss.
-  const base = findBaseItem(sub)
-  const periodEndSource =
-    base
-      ? (base.item as any).current_period_end
-      : (sub.items.data[0] as any)?.current_period_end
-
   console.log(`[webhook] subscription.deleted sub=${sub.id} customer=${customerId}`)
 
   const { error } = await admin
     .from('accounts')
     .update({
-      subscription_status:    'canceled',
+      subscription_status:    null,
       subscription_tier:      null,
       billing_interval:       null,
-      stripe_subscription_id: sub.id,
-      current_period_end:     toIsoOrNull(periodEndSource),
+      stripe_subscription_id: null,
+      current_period_end:     null,
       trial_ends_at:          null,
     })
     .eq('stripe_customer_id', customerId)

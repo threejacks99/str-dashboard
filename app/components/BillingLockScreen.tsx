@@ -5,7 +5,7 @@ import { useBillingStatus } from '../../lib/useBillingStatus'
 
 export default function BillingLockScreen() {
   const { status } = useBillingStatus()
-  const isOrphan = !status?.stripe_customer_id
+  const isOrphan = !status?.stripe_subscription_id
 
   const headline = isOrphan
     ? 'Finish setting up your account'
