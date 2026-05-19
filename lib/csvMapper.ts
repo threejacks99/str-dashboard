@@ -105,6 +105,10 @@ export const COLUMN_MAPPINGS: Record<string, string[]> = {
     'management commission', 'management fee',
     'mgmt fee', 'management', 'pm fee'
   ],
+  property_name: [
+    'property', 'property name', 'listing', 'listing name',
+    'unit', 'unit name', 'house', 'house name'
+  ],
 }
 
 export function mapColumns(headers: string[]): Record<string, string> {
@@ -201,6 +205,10 @@ export const EXPENSE_COLUMN_MAPPINGS: Record<string, string[]> = {
   amount: ['amount', 'cost', 'total', 'expense amount', 'price'],
   category: ['category', 'type', 'expense type', 'expense category'],
   frequency: ['frequency', 'recurring', 'recurrence'],
+  property_name: [
+    'property', 'property name', 'listing', 'listing name',
+    'unit', 'unit name', 'house', 'house name'
+  ],
 }
 
 export function mapExpenseColumns(headers: string[]): Record<string, string> {

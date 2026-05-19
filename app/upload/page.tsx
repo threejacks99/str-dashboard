@@ -201,6 +201,13 @@ export default function UploadPage() {
   const [duplicatesChecked, setDuplicatesChecked]   = useState(false)
   const [showInvalidDetail, setShowInvalidDetail]   = useState(false)
 
+  // Multi-property mode
+  const [multiPropertyMode, setMultiPropertyMode] = useState(false)
+  const [propertyNameToId, setPropertyNameToId]   = useState<Record<string, string>>({})
+  const [unknownPropertyNames, setUnknownPropertyNames] = useState<string[]>([])
+  const [unknownMappings, setUnknownMappings]     = useState<Record<string, string>>({}) // unknown name -> existing property id, or '__new__'
+  const [applyingMappings, setApplyingMappings]   = useState(false)
+
   // Upload
   const [uploading, setUploading]           = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -245,10 +252,13 @@ export default function UploadPage() {
   }, [])
 
   // ── Duplicate detection ───────────────────────────────────────────────────────
+  // Rows in multi-property mode each carry their own _propertyId. Single-property
+  // mode passes propId and every row uses it. Either way, dedup queries are
+  // fanned out per property and merged.
   async function runCheckDuplicates(
     rows: Record<string, any>[],
     type: 'reservations' | 'expenses',
-    propId: string
+    propId: string | null
   ) {
     if (!rows.length) {
       setReadyRows([])
@@ -260,40 +270,62 @@ export default function UploadPage() {
     setCheckingDuplicates(true)
     setDuplicatesChecked(false)
 
+    // Stamp every row with the property_id it will land on
+    const stamped = rows.map(r => ({
+      ...r,
+      _propertyId: r._propertyId ?? propId,
+    })).filter(r => r._propertyId)
+
+    // Group by property
+    const byProperty: Record<string, Record<string, any>[]> = {}
+    for (const r of stamped) {
+      const pid = r._propertyId as string
+      if (!byProperty[pid]) byProperty[pid] = []
+      byProperty[pid].push(r)
+    }
+
     try {
-      if (type === 'reservations') {
-        const refs = rows.map(r => r.reservation_ref).filter(Boolean)
-        if (!refs.length) {
-          setReadyRows(rows)
-          setDuplicateCount(0)
-        } else {
+      const readyAcc: Record<string, any>[] = []
+      let dupeAcc = 0
+
+      for (const [pid, propRows] of Object.entries(byProperty)) {
+        if (type === 'reservations') {
+          const refs = propRows.map(r => r.reservation_ref).filter(Boolean)
+          if (!refs.length) {
+            readyAcc.push(...propRows)
+            continue
+          }
           const { data } = await supabase
             .from('reservations')
             .select('reservation_ref')
-            .eq('property_id', propId)
+            .eq('property_id', pid)
             .in('reservation_ref', refs)
 
           const existing = new Set((data ?? []).map((r: any) => r.reservation_ref))
-          const ready = rows.filter(r => !r.reservation_ref || !existing.has(r.reservation_ref))
-          setReadyRows(ready)
-          setDuplicateCount(rows.length - ready.length)
-        }
-      } else {
-        const fps = rows.map(r => `${r.paid_date}|${r.vendor ?? ''}|${r.amount}`)
-        const { data } = await supabase
-          .from('expenses')
-          .select('paid_date, vendor, amount')
-          .eq('property_id', propId)
+          const ready = propRows.filter(r => !r.reservation_ref || !existing.has(r.reservation_ref))
+          readyAcc.push(...ready)
+          dupeAcc += propRows.length - ready.length
+        } else {
+          const { data } = await supabase
+            .from('expenses')
+            .select('paid_date, vendor, amount')
+            .eq('property_id', pid)
 
-        const existingFps = new Set(
-          (data ?? []).map((r: any) => `${r.paid_date}|${r.vendor ?? ''}|${r.amount}`)
-        )
-        const ready = rows.filter((_, i) => !existingFps.has(fps[i]))
-        setReadyRows(ready)
-        setDuplicateCount(rows.length - ready.length)
+          const existingFps = new Set(
+            (data ?? []).map((r: any) => `${r.paid_date}|${r.vendor ?? ''}|${r.amount}`)
+          )
+          const ready = propRows.filter(r =>
+            !existingFps.has(`${r.paid_date}|${r.vendor ?? ''}|${r.amount}`)
+          )
+          readyAcc.push(...ready)
+          dupeAcc += propRows.length - ready.length
+        }
       }
+
+      setReadyRows(readyAcc)
+      setDuplicateCount(dupeAcc)
     } catch {
-      setReadyRows(rows)
+      setReadyRows(stamped)
       setDuplicateCount(0)
     }
 
@@ -301,9 +333,73 @@ export default function UploadPage() {
     setCheckingDuplicates(false)
   }
 
+  // ── Multi-property resolution handler ─────────────────────────────────────
+  // Re-runs dedup after the user maps every unknown name to either an existing
+  // property id or '__new__' (create new). Creates the new properties first
+  // via POST /api/properties so the tier-cap and overage checks fire.
+  async function applyUnknownMappings() {
+    if (unknownPropertyNames.some(name => !unknownMappings[name])) return
+    if (applyingMappings) return // guard against double-click during in-flight create
+    setApplyingMappings(true)
+
+    const newPropertyNames = unknownPropertyNames.filter(n => unknownMappings[n] === '__new__')
+    const createdMap: Record<string, string> = {}
+
+    for (const name of newPropertyNames) {
+      try {
+        const res = await fetch('/api/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, confirmOverage: true }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.id) {
+          setParseStatus(`Failed to create property "${name}": ${json.error ?? 'unknown error'}. Try mapping it to an existing property instead.`)
+          setApplyingMappings(false)
+          return
+        }
+        createdMap[name.trim().toLowerCase()] = json.id
+      } catch (err: any) {
+        setParseStatus(`Failed to create property "${name}": ${err.message ?? 'network error'}.`)
+        setApplyingMappings(false)
+        return
+      }
+    }
+
+    const { data: refreshed } = await supabase.from('properties').select('id, name').is('deleted_at', null).order('name')
+    if (refreshed) setProperties(refreshed)
+
+    const finalNameMap = { ...propertyNameToId, ...createdMap }
+    const resolveName = (name: string): string | null => {
+      const key = name.trim().toLowerCase()
+      if (finalNameMap[key]) return finalNameMap[key]
+      const mapping = unknownMappings[name]
+      if (mapping && mapping !== '__new__') return mapping
+      return null
+    }
+
+    const stamped = validRows.map(r => {
+      if (!r.property_name) return r
+      const pid = resolveName(r.property_name as string)
+      return pid ? { ...r, _propertyId: pid } : r
+    }).filter(r => r._propertyId)
+
+    // Resolution complete — clear unknowns so the Import button gate passes.
+    // Refresh the name-to-id map too so subsequent re-parses see the new properties.
+    setPropertyNameToId(finalNameMap)
+    setUnknownPropertyNames([])
+    setUnknownMappings({})
+    setApplyingMappings(false)
+
+    if (fileType === 'reservations' || fileType === 'expenses') {
+      runCheckDuplicates(stamped, fileType, null)
+    }
+  }
+
   // ── Property select handler ────────────────────────────────────────────────
   function handlePropertySelect(propId: string) {
     setSelectedPropertyId(propId)
+    if (multiPropertyMode) return
     if (propId && validRows.length > 0 && (fileType === 'reservations' || fileType === 'expenses')) {
       runCheckDuplicates(validRows, fileType, propId)
     } else if (!propId) {
@@ -373,12 +469,55 @@ export default function UploadPage() {
     setInvalidRows(invalid)
     setParseStatus('')
 
-    if (selectedPropertyId && (detected === 'reservations' || detected === 'expenses')) {
-      runCheckDuplicates(valid, detected, selectedPropertyId)
+    // Multi-property detection: only activates when account has >1 property
+    // AND the file contains a property_name column with values. Solo users
+    // (properties.length === 1) get the column read and ignored.
+    const hasPropertyCol = valid.some(r => r.property_name)
+    const isMulti = properties.length > 1 && hasPropertyCol
+
+    if (isMulti) {
+      const nameMap: Record<string, string> = {}
+      for (const p of properties) {
+        nameMap[p.name.trim().toLowerCase()] = p.id
+      }
+
+      const unknownSet = new Set<string>()
+      for (const r of valid) {
+        if (!r.property_name) continue
+        const key = (r.property_name as string).trim().toLowerCase()
+        if (!nameMap[key]) unknownSet.add(r.property_name as string)
+      }
+
+      setMultiPropertyMode(true)
+      setPropertyNameToId(nameMap)
+      setUnknownPropertyNames([...unknownSet].sort())
+      setUnknownMappings({})
+
+      const stamped = valid.map(r => {
+        if (!r.property_name) return r
+        const pid = nameMap[(r.property_name as string).trim().toLowerCase()]
+        return pid ? { ...r, _propertyId: pid } : r
+      })
+
+      if (unknownSet.size === 0) {
+        runCheckDuplicates(stamped, detected, null)
+      } else {
+        setReadyRows([])
+        setDuplicateCount(0)
+        setDuplicatesChecked(false)
+      }
     } else {
-      setReadyRows(valid)
-      setDuplicateCount(0)
-      setDuplicatesChecked(false)
+      setMultiPropertyMode(false)
+      setUnknownPropertyNames([])
+      setUnknownMappings({})
+
+      if (selectedPropertyId && (detected === 'reservations' || detected === 'expenses')) {
+        runCheckDuplicates(valid, detected, selectedPropertyId)
+      } else {
+        setReadyRows(valid)
+        setDuplicateCount(0)
+        setDuplicatesChecked(false)
+      }
     }
   }
 
@@ -442,7 +581,7 @@ export default function UploadPage() {
 
   // ── Upload ────────────────────────────────────────────────────────────────────
   async function handleUpload() {
-    if (!readyRows.length || !fileType || !selectedPropertyId) return
+    if (!readyRows.length || !fileType || (!selectedPropertyId && !multiPropertyMode)) return
     setUploading(true)
     setUploadProgress(0)
     setUploadError(null)
@@ -453,9 +592,10 @@ export default function UploadPage() {
       const withId = readyRows.map(r => {
         const clean: Record<string, any> = {}
         for (const [k, v] of Object.entries(r)) {
-          if (!k.startsWith('_')) clean[k] = v
+          if (!k.startsWith('_') && k !== 'property_name') clean[k] = v
         }
-        return { ...clean, property_id: selectedPropertyId }
+        const pid = r._propertyId ?? selectedPropertyId
+        return { ...clean, property_id: pid }
       })
 
       let imported = 0
@@ -469,8 +609,11 @@ export default function UploadPage() {
         }
       }
 
+      const uploadPropertyId = multiPropertyMode
+        ? (withId[0]?.property_id ?? selectedPropertyId)
+        : selectedPropertyId
       supabase.from('uploads').insert({
-        property_id: selectedPropertyId,
+        property_id: uploadPropertyId,
         upload_type: fileType,
         filename: filename || null,
         row_count: imported,
@@ -490,6 +633,9 @@ export default function UploadPage() {
       setFileType(null)
       setFilename('')
       setParseStatus('')
+      setMultiPropertyMode(false)
+      setUnknownPropertyNames([])
+      setUnknownMappings({})
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err: any) {
       setUploadError(err.message ?? 'Upload failed. Please try again.')
@@ -582,8 +728,8 @@ export default function UploadPage() {
             </div>
           ) : (
             <>
-              {/* ── Property selector ───────────────────────────────────────── */}
-              <div style={cardStyle}>
+              {/* ── Property selector (single-property mode only) ──────────── */}
+              {!multiPropertyMode && <div style={cardStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: '200px' }}>
                     <div style={labelStyle}>Property</div>
@@ -617,7 +763,7 @@ export default function UploadPage() {
                     </button>
                   )}
                 </div>
-              </div>
+              </div>}
 
               {/* ── Inline create form ───────────────────────────────────────── */}
               {showCreateForm && (
@@ -639,7 +785,7 @@ export default function UploadPage() {
                     Uploading to: <strong style={{ color: '#0D2C54' }}>{selectedProperty.name}</strong>
                   </p>
                 )}
-                {!selectedPropertyId && properties.length > 1 && (
+                {!selectedPropertyId && !multiPropertyMode && properties.length > 1 && (
                   <p style={{ fontSize: '13px', color: '#FF7767', marginBottom: '10px' }}>
                     Select a property above before uploading.
                   </p>
@@ -658,6 +804,72 @@ export default function UploadPage() {
                   </p>
                 )}
               </div>
+
+              {/* ── Multi-property mode banner + resolution UI ──────────────── */}
+              {multiPropertyMode && hasFileLoaded && (
+                <div style={{ ...cardStyle, borderColor: '#FFE3DF', background: '#FFF9F8' }}>
+                  <div style={{
+                    fontSize: '12px', fontWeight: '700', color: '#FF7767',
+                    textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px',
+                  }}>
+                    Multi-property file detected
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#555', marginBottom: '14px', lineHeight: '1.5' }}>
+                    Hostics found a Property column in this file. Rows will be split across properties automatically.
+                  </div>
+
+                  {unknownPropertyNames.length === 0 ? (
+                    <div style={{ fontSize: '13px', color: '#1A6E47', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>✓</span> All property names matched existing properties.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '13px', color: '#0D2C54', fontWeight: '600', marginBottom: '10px' }}>
+                        {unknownPropertyNames.length} property {unknownPropertyNames.length === 1 ? 'name' : 'names'} in the file {unknownPropertyNames.length === 1 ? "doesn't" : "don't"} match any of your properties:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                        {unknownPropertyNames.map(name => (
+                          <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              fontSize: '13px', fontWeight: '600', color: '#0D2C54',
+                              background: '#fff', padding: '6px 12px', borderRadius: '6px',
+                              border: '1px solid #ddd', minWidth: '160px',
+                            }}>
+                              {name}
+                            </span>
+                            <span style={{ color: '#aaa' }}>→</span>
+                            <select
+                              value={unknownMappings[name] ?? ''}
+                              onChange={e => setUnknownMappings(prev => ({ ...prev, [name]: e.target.value }))}
+                              style={{ ...inputStyle, width: 'auto', minWidth: '240px', cursor: 'pointer' }}
+                            >
+                              <option value="">Choose an action…</option>
+                              <option value="__new__">+ Create new property "{name}"</option>
+                              <option disabled>──────────</option>
+                              {properties.map(p => (
+                                <option key={p.id} value={p.id}>Map to {p.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={applyUnknownMappings}
+                        disabled={unknownPropertyNames.some(n => !unknownMappings[n]) || applyingMappings}
+                        style={{
+                          background: (unknownPropertyNames.some(n => !unknownMappings[n]) || applyingMappings) ? '#faa99f' : '#FF7767',
+                          color: '#fff', border: 'none', padding: '10px 22px',
+                          borderRadius: '8px', fontSize: '14px', fontWeight: '700',
+                          fontFamily: 'Raleway, sans-serif',
+                          cursor: (unknownPropertyNames.some(n => !unknownMappings[n]) || applyingMappings) ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {applyingMappings ? 'Applying…' : 'Apply mapping'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* ── Summary panel ───────────────────────────────────────────── */}
               {hasFileLoaded && (
@@ -716,7 +928,7 @@ export default function UploadPage() {
                         <span>
                           <strong>{validRows.length.toLocaleString()}</strong> {validRows.length === 1 ? 'row' : 'rows'} parsed
                         </span>
-                        {!selectedPropertyId && (
+                        {!selectedPropertyId && !multiPropertyMode && (
                           <span style={{ fontSize: '12px', color: '#aaa', marginLeft: '4px' }}>
                             — select a property to check for duplicates
                           </span>
@@ -819,7 +1031,7 @@ export default function UploadPage() {
               )}
 
               {/* ── Import button ─────────────────────────────────────────────── */}
-              {hasFileLoaded && selectedPropertyId && !checkingDuplicates && (
+              {hasFileLoaded && (selectedPropertyId || multiPropertyMode) && !checkingDuplicates && unknownPropertyNames.length === 0 && (
                 duplicatesChecked && readyRows.length === 0 && duplicateCount > 0 ? (
                   <button disabled style={{
                     background: '#f0f0f0', color: '#aaa', border: 'none', padding: '12px 32px',
