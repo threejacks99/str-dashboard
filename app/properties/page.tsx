@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { useBillingStatus } from '../../lib/useBillingStatus'
-import { TIER_PROPERTY_CAPS } from '../../lib/billing'
+import { TIER_PROPERTY_CAPS, isAccountLocked } from '../../lib/billing'
 import PropertyForm from '../components/PropertyForm'
+import BillingLockScreen from '../components/BillingLockScreen'
 
 interface Property {
   id: string
@@ -150,7 +151,7 @@ export default function PropertiesPage() {
     setShowForm(true)
   }
 
-  if (loading) {
+  if (loading || billingLoading) {
     return (
       <div style={{ padding: '40px', fontFamily: 'Raleway, sans-serif' }}>
         <div style={{ width: '160px', height: '28px', background: '#e8eaed', borderRadius: '8px', marginBottom: '32px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
@@ -162,6 +163,8 @@ export default function PropertiesPage() {
       </div>
     )
   }
+
+  if (isAccountLocked(status)) return <BillingLockScreen />
 
   return (
     <div style={{ padding: '40px', fontFamily: 'Raleway, sans-serif', maxWidth: '960px' }}>

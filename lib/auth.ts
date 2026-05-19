@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { type BillingStatus } from './billing'
 
 export type UserAccountInfo = {
   account_id: string
@@ -72,4 +73,21 @@ export async function getAccessibleClientIds(
     .in('account_id', accountIds)
 
   return (clients ?? []).map((c: { id: string }) => c.id)
+}
+
+
+// Returns the BillingStatus for the user's account, or null if there is no
+// account row. Callers gate on isAccountLocked which treats null as not-locked.
+export async function fetchAccountBillingStatus(
+  userAccountInfo: UserAccountInfo[]
+): Promise<BillingStatus | null> {
+  const accountId = userAccountInfo[0]?.account_id
+  if (!accountId) return null
+  const supabase = await createAuthenticatedClient()
+  const { data } = await supabase
+    .from('accounts')
+    .select('subscription_tier, subscription_status, billing_interval, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id')
+    .eq('id', accountId)
+    .maybeSingle()
+  return data as BillingStatus | null
 }

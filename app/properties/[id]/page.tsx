@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabase'
+import { useBillingStatus } from '../../../lib/useBillingStatus'
+import { isAccountLocked } from '../../../lib/billing'
 import PropertyForm, { PropertyFormInitialValues } from '../../components/PropertyForm'
+import BillingLockScreen from '../../components/BillingLockScreen'
 
 export default function EditPropertyPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
+  const { status, loading: billingLoading } = useBillingStatus()
 
   const [loading, setLoading]   = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -43,7 +47,7 @@ export default function EditPropertyPage() {
     load()
   }, [id])
 
-  if (loading) {
+  if (loading || billingLoading) {
     return (
       <div style={{ padding: '40px', fontFamily: 'Raleway, sans-serif' }}>
         <div style={{ width: '240px', height: '28px', background: '#e8eaed', borderRadius: '8px', marginBottom: '32px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
@@ -55,6 +59,8 @@ export default function EditPropertyPage() {
       </div>
     )
   }
+
+  if (isAccountLocked(status)) return <BillingLockScreen />
 
   if (notFound) {
     return (

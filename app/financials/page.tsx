@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds } from '../../lib/auth'
+import { createAuthenticatedClient, getCurrentUserAccount, getAccessibleClientIds, fetchAccountBillingStatus } from '../../lib/auth'
+import { isAccountLocked } from '../../lib/billing'
+import BillingLockScreen from '../components/BillingLockScreen'
 import PLTable from '../components/financials/PLTable'
 import type { PLTablePrior } from '../components/financials/PLTable'
 import NoiTrendChart from '../components/financials/NoiTrendChart'
@@ -190,7 +192,9 @@ export default async function FinancialsPage({
   const supabase   = await createAuthenticatedClient()
 
   const userAccount = await getCurrentUserAccount()
-  const clientIds   = await getAccessibleClientIds(userAccount)
+  if (isAccountLocked(await fetchAccountBillingStatus(userAccount))) return <BillingLockScreen />
+
+  const clientIds = await getAccessibleClientIds(userAccount)
 
   if (!clientIds.length) return <EmptyState />
 
