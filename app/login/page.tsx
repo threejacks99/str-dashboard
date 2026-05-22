@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
@@ -184,14 +185,16 @@ function LoginPageContent() {
         <div style={cardStyle}>
           {/* Wordmark */}
           <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-            <Image
-              src="/hostics-logo-coral-navy.svg"
-              alt="Hostics — STR Analytics"
-              width={200}
-              height={56}
-              style={{ height: 'auto' }}
-              priority
-            />
+            <Link href="/" style={{ display: 'inline-block', lineHeight: 0, textDecoration: 'none' }}>
+              <Image
+                src="/hostics-logo-coral-navy.svg"
+                alt="Hostics — STR Analytics"
+                width={200}
+                height={56}
+                style={{ height: 'auto' }}
+                priority
+              />
+            </Link>
           </div>
 
           <h2 style={{
@@ -344,14 +347,16 @@ function LoginPageContent() {
         <div style={{ width: '100%', maxWidth: '1100px' }}>
           {/* Wordmark */}
           <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-            <Image
-              src="/hostics-logo-coral-navy.svg"
-              alt="Hostics — STR Analytics"
-              width={200}
-              height={56}
-              style={{ height: 'auto' }}
-              priority
-            />
+            <Link href="/" style={{ display: 'inline-block', lineHeight: 0, textDecoration: 'none' }}>
+              <Image
+                src="/hostics-logo-coral-navy.svg"
+                alt="Hostics — STR Analytics"
+                width={200}
+                height={56}
+                style={{ height: 'auto' }}
+                priority
+              />
+            </Link>
           </div>
 
           <h2 style={{

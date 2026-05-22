@@ -40,14 +40,16 @@ export default function Sidebar() {
         padding: '28px 24px 24px',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
       }}>
-        <Image
-          src="/hostics-logo-coral-white.svg"
-          alt="Hostics — STR Analytics"
-          width={140}
-          height={40}
-          style={{ height: 'auto' }}
-          priority
-        />
+        <Link href="/dashboard" style={{ display: 'inline-block', lineHeight: 0, textDecoration: 'none' }}>
+          <Image
+            src="/hostics-logo-coral-white.svg"
+            alt="Hostics — STR Analytics"
+            width={140}
+            height={40}
+            style={{ height: 'auto' }}
+            priority
+          />
+        </Link>
       </div>
 
       {/* Navigation */}

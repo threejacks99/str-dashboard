@@ -104,14 +104,16 @@ function ResetShell({ children }: { children: React.ReactNode }) {
     }}>
       <div style={cardStyle}>
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <Image
-            src="/hostics-logo-coral-navy.svg"
-            alt="Hostics — STR Analytics"
-            width={200}
-            height={56}
-            style={{ height: 'auto' }}
-            priority
-          />
+          <Link href="/" style={{ display: 'inline-block', lineHeight: 0, textDecoration: 'none' }}>
+            <Image
+              src="/hostics-logo-coral-navy.svg"
+              alt="Hostics — STR Analytics"
+              width={200}
+              height={56}
+              style={{ height: 'auto' }}
+              priority
+            />
+          </Link>
         </div>
         {children}
       </div>
