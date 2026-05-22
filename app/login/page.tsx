@@ -78,6 +78,11 @@ function LoginPageContent() {
   const [error, setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // Forgot-password sub-flow (signin branch only — not part of the mode union)
+  const [resetSent, setResetSent]       = useState(false)
+  const [resetError, setResetError]     = useState<string | null>(null)
+  const [resetSending, setResetSending] = useState(false)
+
   const [selectedTier, setSelectedTier]         = useState<Tier | undefined>(initialTier)
   const [selectedInterval, setSelectedInterval] = useState<BillingInterval>(initialInterval)
 
@@ -142,6 +147,26 @@ function LoginPageContent() {
     }
   }
 
+  async function handleForgotPassword() {
+    setResetError(null)
+    if (!email) {
+      setResetError('Enter your email address above first, then click "Forgot password?".')
+      return
+    }
+    setResetSending(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset`,
+      })
+      if (error) throw error
+      setResetSent(true)
+    } catch (err: unknown) {
+      setResetError(err instanceof Error ? err.message : 'Could not send the reset email. Please try again.')
+    } finally {
+      setResetSending(false)
+    }
+  }
+
   const signinDisabled = loading
   const signupDisabled = loading || !selectedTier || !email || !password
 
@@ -194,6 +219,31 @@ function LoginPageContent() {
             </div>
           )}
 
+          {resetSent && (
+            <div style={{
+              background: '#F0FFF8',
+              border: '1px solid #A8E6C3',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              color: '#1A6E47',
+              lineHeight: '1.5',
+            }}>
+              If an account exists for that email, we&apos;ve sent a reset link. Check your inbox.
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setResetSent(false); setResetError(null) }}
+                  style={toggleStyle}
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!resetSent && (
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>Email</label>
@@ -220,6 +270,32 @@ function LoginPageContent() {
                 style={inputStyle}
               />
             </div>
+
+            <div style={{ marginTop: '-14px', marginBottom: '20px', textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetSending}
+                style={toggleStyle}
+              >
+                {resetSending ? 'Sending…' : 'Forgot password?'}
+              </button>
+            </div>
+
+            {resetError && (
+              <div style={{
+                background: '#FFF0EE',
+                border: '1px solid #FFCDC7',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '20px',
+                fontSize: '13px',
+                color: '#B83224',
+                lineHeight: '1.5',
+              }}>
+                {resetError}
+              </div>
+            )}
 
             {error && (
               <div style={{
@@ -257,6 +333,7 @@ function LoginPageContent() {
               {loading ? 'Please wait…' : 'Sign In'}
             </button>
           </form>
+          )}
 
           <p style={{ textAlign: 'center', marginTop: '22px', fontSize: '14px', color: '#888' }}>
             Don&apos;t have an account?{' '}
