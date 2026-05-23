@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendEmail } from '../../../lib/postmark'
+import { signupConfirmationEmail } from '../../../lib/email-templates'
 
 export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -69,6 +71,13 @@ export async function POST(req: NextRequest) {
       .from('clients')
       .insert({ account_id: accountId, name: accountName?.trim() || 'My Property', email })
     if (clientError) throw new Error(`Could not create default client: ${clientError.message}`)
+
+    try {
+      const { subject, htmlBody, textBody } = signupConfirmationEmail(accountName?.trim() || email, email)
+      await sendEmail({ to: email, subject, htmlBody, textBody })
+    } catch (e) {
+      console.error('[signup] welcome email failed (non-fatal):', e instanceof Error ? e.message : e)
+    }
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (err: any) {

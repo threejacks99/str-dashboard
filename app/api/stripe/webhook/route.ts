@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import type { Tier, BillingInterval } from '../../../../lib/billing'
+import { sendEmail } from '../../../../lib/postmark'
+import { trialEndingEmail, planChangeEmail } from '../../../../lib/email-templates'
 
 export const dynamic = 'force-dynamic'
 
@@ -116,6 +118,12 @@ async function handleSubscriptionChange(sub: Stripe.Subscription) {
     `status=${sub.status} tier=${tier} interval=${interval}`
   )
 
+  const { data: prior } = await admin
+    .from('accounts')
+    .select('name, billing_email, subscription_tier, billing_interval')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle()
+
   const { error } = await admin
     .from('accounts')
     .update({
@@ -132,6 +140,23 @@ async function handleSubscriptionChange(sub: Stripe.Subscription) {
     console.error(
       `[webhook] subscription.change sub=${sub.id} customer=${customerId} db update failed: ${error.message}`
     )
+  }
+
+  try {
+    if (prior?.billing_email && prior.subscription_tier && prior.billing_interval &&
+        tier && interval &&
+        (prior.subscription_tier !== tier || prior.billing_interval !== interval)) {
+      const { subject, htmlBody, textBody } = planChangeEmail({
+        accountName: prior.name || prior.billing_email,
+        recipientEmail: prior.billing_email,
+        oldTier: prior.subscription_tier as Tier,
+        oldInterval: prior.billing_interval as BillingInterval,
+        newTier: tier, newInterval: interval,
+      })
+      await sendEmail({ to: prior.billing_email, subject, htmlBody, textBody })
+    }
+  } catch (e) {
+    console.error(`[webhook] plan-change email failed (non-fatal) sub=${sub.id}: ${e instanceof Error ? e.message : e}`)
   }
 }
 
@@ -163,6 +188,26 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
   }
 }
 
+async function handleTrialWillEnd(sub: Stripe.Subscription) {
+  const customerId = typeof sub.customer === 'string' ? sub.customer : (sub.customer as any)?.id
+  if (!customerId) { console.error(`[webhook] trial_will_end sub=${sub.id} no customer — skipping`); return }
+  const base = findBaseItem(sub)
+  const trialEndsAt = toIsoOrNull(sub.trial_end)
+  if (!base || !trialEndsAt) { console.warn(`[webhook] trial_will_end sub=${sub.id} missing base/trial_end — skipping`); return }
+  const { data: acct } = await admin
+    .from('accounts').select('name, billing_email').eq('stripe_customer_id', customerId).maybeSingle()
+  if (!acct?.billing_email) { console.warn(`[webhook] trial_will_end sub=${sub.id} no billing_email — skipping`); return }
+  try {
+    const { subject, htmlBody, textBody } = trialEndingEmail({
+      accountName: acct.name || acct.billing_email, recipientEmail: acct.billing_email,
+      tier: base.tier, interval: base.interval, trialEndsAt,
+    })
+    await sendEmail({ to: acct.billing_email, subject, htmlBody, textBody })
+  } catch (e) {
+    console.error(`[webhook] trial-ending email failed (non-fatal) sub=${sub.id}: ${e instanceof Error ? e.message : e}`)
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text()
   const sig  = req.headers.get('stripe-signature') ?? ''
@@ -182,6 +227,9 @@ export async function POST(req: NextRequest) {
         break
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
+        break
+      case 'customer.subscription.trial_will_end':
+        await handleTrialWillEnd(event.data.object as Stripe.Subscription)
         break
       default:
         break
