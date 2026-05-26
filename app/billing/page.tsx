@@ -137,7 +137,7 @@ export default function BillingPage() {
             )}
           </div>
 
-          {isActive && status.stripe_customer_id && (
+          {(isActive || isTrialing) && status.stripe_customer_id && (
             <button
               onClick={handleManageSubscription}
               disabled={portalLoading}
