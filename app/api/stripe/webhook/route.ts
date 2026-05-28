@@ -3,7 +3,7 @@ import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import type { Tier, BillingInterval } from '../../../../lib/billing'
 import { sendEmail } from '../../../../lib/postmark'
-import { trialEndingEmail, planChangeEmail } from '../../../../lib/email-templates'
+import { trialEndingEmail, planChangeEmail, cancellationEmail } from '../../../../lib/email-templates'
 
 export const dynamic = 'force-dynamic'
 
@@ -120,7 +120,7 @@ async function handleSubscriptionChange(sub: Stripe.Subscription) {
 
   const { data: prior } = await admin
     .from('accounts')
-    .select('name, billing_email, subscription_tier, billing_interval')
+    .select('name, billing_email, subscription_tier, billing_interval, cancel_email_sent_at')
     .eq('stripe_customer_id', customerId)
     .maybeSingle()
 
@@ -157,6 +157,46 @@ async function handleSubscriptionChange(sub: Stripe.Subscription) {
     }
   } catch (e) {
     console.error(`[webhook] plan-change email failed (non-fatal) sub=${sub.id}: ${e instanceof Error ? e.message : e}`)
+  }
+
+  // Cancellation-confirmation email — fires once on the cancel_at_period_end
+  // false->true edge. The guard column self-heals: a resubscribe (cancel_at_
+  // period_end back to false) clears it, re-arming for a future cancellation.
+  // Kept out of handleSubscriptionDeleted on purpose: deleted fires at period
+  // end, when access has already ended; the "access continues until" wording
+  // only fits the moment the cancel is scheduled (this updated event).
+  try {
+    // dahlia (2026-04-22) deprecated cancel_at_period_end (reads false even when a
+    // cancel is scheduled). cancel_at — a Unix-seconds timestamp — is the live signal
+    // for a pending cancel-at-period-end. Keep the old boolean as a defensive fallback
+    // in case the account's API version is ever pinned older. Mirrors the basil
+    // current_period_end field-migration already handled elsewhere in this file.
+    const cancelAt = (sub as any).cancel_at as number | null | undefined
+    const cancelPending = cancelAt != null || sub.cancel_at_period_end === true
+    const alreadySent = prior?.cancel_email_sent_at != null
+
+    if (cancelPending && !alreadySent && prior?.billing_email && tier && interval) {
+      const accessUntil = toIsoOrNull(periodEndSource)
+      if (accessUntil) {
+        const { subject, htmlBody, textBody } = cancellationEmail({
+          accountName: prior.name || prior.billing_email,
+          recipientEmail: prior.billing_email,
+          tier, interval, accessUntil,
+        })
+        await sendEmail({ to: prior.billing_email, subject, htmlBody, textBody })
+        // Mark sent only after a successful send, so a send failure retries on the next event.
+        await admin.from('accounts')
+          .update({ cancel_email_sent_at: new Date().toISOString() })
+          .eq('stripe_customer_id', customerId)
+      }
+    } else if (!cancelPending && alreadySent) {
+      // Resubscribe / un-cancel: re-arm the guard for a future cancellation.
+      await admin.from('accounts')
+        .update({ cancel_email_sent_at: null })
+        .eq('stripe_customer_id', customerId)
+    }
+  } catch (e) {
+    console.error(`[webhook] cancellation email failed (non-fatal) sub=${sub.id}: ${e instanceof Error ? e.message : e}`)
   }
 }
 

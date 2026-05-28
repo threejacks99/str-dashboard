@@ -146,3 +146,20 @@ export function planChangeEmail(args: {
     recipientEmail: args.recipientEmail,
   }, 'Your Hostics plan has changed')
 }
+
+export function cancellationEmail(args: {
+  accountName: string; recipientEmail: string; tier: Tier; interval: BillingInterval; accessUntil: string
+}) {
+  const when = formatDate(args.accessUntil)
+  return build({
+    heading: 'Your cancellation is confirmed',
+    intro: [
+      `Hi ${escapeHtml(args.accountName)}, your Hostics ${TIER_LABELS[args.tier]} plan (${intervalLabel(args.interval)}) is set to cancel at the end of your current billing period.`,
+      `You'll keep full access until ${when}, and you won't be charged again. After that date your account is locked, but all your data stays saved — nothing is deleted.`,
+      `Changed your mind? Resubscribe any time before ${when} to keep your plan without interruption.`,
+    ],
+    cta: { label: 'Manage subscription', url: BILLING_URL },
+    finePrint: [support],
+    recipientEmail: args.recipientEmail,
+  }, 'Your Hostics cancellation is confirmed')
+}
