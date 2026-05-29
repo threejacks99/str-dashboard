@@ -43,10 +43,6 @@ const errorStyle: React.CSSProperties = {
   fontSize: '12px', color: '#B83224', marginTop: '4px',
 }
 
-const rowStyle: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px',
-}
-
 function parseCurrency(s: string): number {
   const isNeg = s.trim().startsWith('-') || s.trim().startsWith('(')
   const cleaned = parseFloat(s.replace(/[$,\s()]/g, '')) || 0
@@ -308,7 +304,7 @@ export default function ExpenseForm({
       </div>
 
       {/* Date + Vendor */}
-      <div style={rowStyle}>
+      <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Paid Date <Req /></label>
           <input type="date" value={paidDate} onChange={e => setPaidDate(e.target.value)} style={inputStyle} />
@@ -344,7 +340,7 @@ export default function ExpenseForm({
       </div>
 
       {/* Category + Frequency */}
-      <div style={rowStyle}>
+      <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Category <Req /></label>
           <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>

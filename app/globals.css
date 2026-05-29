@@ -130,3 +130,10 @@ textarea::placeholder {
   border-collapse: collapse;
   min-width: 1040px;
 }
+
+/* ── Edit-form field grids (Phase 2b) ───────────────────────────── */
+.hostics-form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hostics-form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) {
+  .hostics-form-grid, .hostics-form-grid-3 { grid-template-columns: 1fr; }
+}

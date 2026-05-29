@@ -506,7 +506,7 @@ export default function PropertyForm({
       <div style={cardStyle}>
         <h2 style={sectionHeadingStyle}>Unit Details</h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
           <div>
             <label style={labelStyle}>Bedrooms</label>
             <input
@@ -529,7 +529,7 @@ export default function PropertyForm({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div className="hostics-form-grid">
           <div>
             <label style={labelStyle}>Nights Available / Year</label>
             <input
@@ -585,7 +585,7 @@ export default function PropertyForm({
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="hostics-form-grid">
             <div>
               <label style={labelStyle}>Latitude</label>
               <input

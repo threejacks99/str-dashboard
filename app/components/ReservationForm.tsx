@@ -57,10 +57,6 @@ const hintStyle: React.CSSProperties = {
   fontSize: '11px', color: '#aaa', marginTop: '4px',
 }
 
-const rowStyle: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px',
-}
-
 function parseCurrency(s: string): number {
   if (!s.trim()) return 0
   return parseFloat(s.replace(/[$,\s]/g, '')) || 0
@@ -368,7 +364,7 @@ export default function ReservationForm({
       </div>
 
       {/* Ref + Guest */}
-      <div style={rowStyle}>
+      <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Confirmation #</label>
           <input type="text" value={reservationRef} onChange={e => setReservationRef(e.target.value)}
@@ -382,7 +378,7 @@ export default function ReservationForm({
       </div>
 
       {/* Source + Status */}
-      <div style={rowStyle}>
+      <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Booking Source <Req /></label>
           <select value={bookingSource} onChange={e => setBookingSource(e.target.value)} style={inputStyle}>
@@ -402,7 +398,7 @@ export default function ReservationForm({
       </div>
 
       {/* Dates */}
-      <div style={rowStyle}>
+      <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Check-in <Req /></label>
           <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} style={inputStyle} />
@@ -418,7 +414,7 @@ export default function ReservationForm({
       </div>
 
       {/* Nights + Guests */}
-      <div style={{ ...rowStyle, gridTemplateColumns: '1fr 1fr 1fr' }}>
+      <div className="hostics-form-grid-3" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Nights</label>
           <input type="text" value={nights > 0 ? String(nights) : ''} readOnly
@@ -437,7 +433,7 @@ export default function ReservationForm({
       </div>
 
       {/* Gross Rent + Management Fee */}
-      <div style={rowStyle}>
+      <div className="hostics-form-grid" style={{ marginBottom: '16px' }}>
         <div>
           <label style={labelStyle}>Gross Rent <Req /></label>
           <div style={{ position: 'relative' }}>
