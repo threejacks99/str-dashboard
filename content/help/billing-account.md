@@ -2,6 +2,7 @@
 title: Billing & Account
 ---
 
-Manage your subscription, payment methods, and account settings.
+Manage your subscription, payment method, plan changes, and account access.
 
-- [Billing & Subscriptions FAQ](/help/billing-and-subscriptions)
+- [Billing and subscriptions](/help/billing-and-subscriptions)
+- [Resetting your password](/help/password-reset)

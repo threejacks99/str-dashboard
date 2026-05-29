@@ -6,53 +6,46 @@ const CATEGORIES = [
     name: 'Getting Started',
     description: 'First steps, signup, and navigating Hostics.',
     slug: 'getting-started',
-    count: 0,
   },
   {
     emoji: '📁',
     name: 'Importing Data',
     description: 'How to upload data from Airbnb, VRBO, and other platforms.',
     slug: 'importing-data',
-    count: 0,
   },
   {
     emoji: '📊',
     name: 'Understanding Your Metrics',
     description: 'Detailed explanations of every KPI and chart.',
     slug: 'understanding-metrics',
-    count: 0,
   },
   {
     emoji: '🏠',
     name: 'Managing Properties',
     description: 'Adding, editing, and managing multiple properties.',
     slug: 'managing-properties',
-    count: 0,
   },
   {
     emoji: '💳',
     name: 'Billing & Account',
     description: 'Subscriptions, payments, and account settings.',
     slug: 'billing-account',
-    count: 0,
   },
   {
     emoji: '🛠️',
     name: 'Troubleshooting',
     description: 'Common issues and how to fix them.',
     slug: 'troubleshooting',
-    count: 0,
   },
   {
     emoji: '❓',
     name: 'FAQ',
     description: 'Quick answers to top questions.',
     slug: 'faq',
-    count: 0,
   },
 ]
 
-function CategoryCard({ emoji, name, description, slug, count }: typeof CATEGORIES[number]) {
+function CategoryCard({ emoji, name, description, slug }: typeof CATEGORIES[number]) {
   return (
     <Link
       href={`/help/${slug}`}
@@ -89,19 +82,6 @@ function CategoryCard({ emoji, name, description, slug, count }: typeof CATEGORI
         }}>
           {description}
         </div>
-        <span style={{
-          display: 'inline-block',
-          background: '#F0F4F9',
-          color: '#0D2C54',
-          fontSize: '11px',
-          fontWeight: 700,
-          padding: '3px 10px',
-          borderRadius: '20px',
-          fontFamily: 'Raleway, sans-serif',
-          letterSpacing: '0.02em',
-        }}>
-          {count === 0 ? 'Coming soon' : `${count} article${count === 1 ? '' : 's'}`}
-        </span>
       </div>
     </Link>
   )
