@@ -333,9 +333,8 @@ export default async function FinancialsPage({
   for (const p of (properties ?? []) as any[]) {
     propertyNameMap[p.id] = p.deleted_at ? `${p.name} (deleted)` : p.name
   }
-  const recentExpenses = [...(expenses ?? [])]
+  const tableExpenses = [...(expenses ?? [])]
     .sort((a: any, b: any) => (b.paid_date ?? '').localeCompare(a.paid_date ?? ''))
-    .slice(0, 50)
     .map((e: any) => ({
       ...e,
       property_name: e.property_id ? (propertyNameMap[e.property_id] ?? null) : null,
@@ -365,7 +364,7 @@ export default async function FinancialsPage({
 
       <ExpensesChart data={current.expensesByCategory} />
 
-      <ExpenseTable expenses={recentExpenses} />
+      <ExpenseTable expenses={tableExpenses} />
     </div>
   )
 }

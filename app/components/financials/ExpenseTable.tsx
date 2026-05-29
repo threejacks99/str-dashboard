@@ -1,8 +1,23 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Edit2 } from 'lucide-react'
+import {
+  TextFilter,
+  NumericRangeFilter,
+  DateRangeFilter,
+  MultiSelectFilter,
+  matchText,
+  matchNumericRange,
+  matchDateRange,
+  matchMultiSelect,
+  distinctValues,
+  emptyNumericRange,
+  emptyDateRange,
+  type NumericRange,
+  type DateRange,
+} from '../table/TableFilters'
 
 export interface ExpenseRow {
   id: string
@@ -40,6 +55,16 @@ export default function ExpenseTable({ expenses }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('paid_date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
+  // Column filter state
+  const [fProperty, setFProperty]       = useState<string[]>([])
+  const [fDate, setFDate]               = useState<DateRange>(emptyDateRange)
+  const [fVendor, setFVendor]           = useState('')
+  const [fDescription, setFDescription] = useState('')
+  const [fCategory, setFCategory]       = useState<string[]>([])
+  const [fAmount, setFAmount]           = useState<NumericRange>(emptyNumericRange)
+
+  const [visibleCount, setVisibleCount] = useState(50)
+
   const showPropertyColumn = useMemo(
     () => new Set(expenses.map(e => e.property_id).filter(Boolean)).size > 1,
     [expenses]
@@ -54,17 +79,70 @@ export default function ExpenseTable({ expenses }: Props) {
     }
   }
 
-  const sorted = [...expenses].sort((a, b) => {
-    let cmp = 0
-    if (sortKey === 'amount') {
-      cmp = (a.amount ?? 0) - (b.amount ?? 0)
-    } else {
-      const av = (a[sortKey] ?? '') as string
-      const bv = (b[sortKey] ?? '') as string
-      cmp = av.localeCompare(bv)
-    }
-    return sortDir === 'asc' ? cmp : -cmp
-  })
+  // Distinct option lists for the multi-select filters
+  const propertyOptions = useMemo(
+    () => distinctValues(expenses, e => e.property_name),
+    [expenses]
+  )
+  const categoryOptions = useMemo(
+    () => distinctValues(expenses, e => e.category, { caseInsensitive: true }),
+    [expenses]
+  )
+
+  // Column filters: narrow the set before sorting.
+  const columnFiltered = useMemo(() => {
+    return expenses.filter(e =>
+      matchMultiSelect(e.property_name, fProperty) &&
+      matchDateRange(e.paid_date, fDate) &&
+      matchText(e.vendor, fVendor) &&
+      matchText(e.description, fDescription) &&
+      matchMultiSelect(e.category, fCategory, { caseInsensitive: true }) &&
+      matchNumericRange(e.amount, fAmount)
+    )
+  }, [expenses, fProperty, fDate, fVendor, fDescription, fCategory, fAmount])
+
+  const sorted = useMemo(() => {
+    return [...columnFiltered].sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'amount') {
+        cmp = (a.amount ?? 0) - (b.amount ?? 0)
+      } else {
+        const av = (a[sortKey] ?? '') as string
+        const bv = (b[sortKey] ?? '') as string
+        cmp = av.localeCompare(bv)
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [columnFiltered, sortKey, sortDir])
+
+  // Active column-filter accounting
+  const rangeActive = (r: NumericRange) => r.min.trim() !== '' || r.max.trim() !== ''
+  const dateActive  = (r: DateRange)  => r.from.trim() !== '' || r.to.trim() !== ''
+  const activeFilterCount =
+    (fProperty.length > 0 ? 1 : 0) +
+    (dateActive(fDate) ? 1 : 0) +
+    (fVendor.trim() !== '' ? 1 : 0) +
+    (fDescription.trim() !== '' ? 1 : 0) +
+    (fCategory.length > 0 ? 1 : 0) +
+    (rangeActive(fAmount) ? 1 : 0)
+
+  function clearFilters() {
+    setFProperty([])
+    setFDate(emptyDateRange)
+    setFVendor('')
+    setFDescription('')
+    setFCategory([])
+    setFAmount(emptyNumericRange)
+  }
+
+  // Reset progressive rendering whenever the result set could change.
+  useEffect(() => {
+    setVisibleCount(50)
+  }, [fProperty, fDate, fVendor, fDescription, fCategory, fAmount, sortKey, sortDir])
+
+  const total   = sorted.length
+  const visible = sorted.slice(0, visibleCount)
+  const shown   = visible.length
 
   function SortIcon({ col }: { col: SortKey }) {
     if (col !== sortKey) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>↕</span>
@@ -85,6 +163,13 @@ export default function ExpenseTable({ expenses }: Props) {
     whiteSpace: 'nowrap',
   }
 
+  const filterTd: React.CSSProperties = {
+    padding: '6px 10px',
+    background: '#F7F9FB',
+    borderBottom: '1px solid #e5e9ef',
+    verticalAlign: 'top',
+  }
+
   return (
     <div style={{
       background: '#fff',
@@ -103,10 +188,44 @@ export default function ExpenseTable({ expenses }: Props) {
         borderBottom: '1px solid #f0f0f0',
         fontFamily: 'Raleway, sans-serif',
       }}>
-        Recent Expenses
+        Expenses
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+
+      {/* Active column-filter bar */}
+      {activeFilterCount > 0 && (
+        <div style={{
+          padding: '8px 24px',
+          borderBottom: '1px solid #f0f0f0',
+          background: '#FFF5F4',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          fontFamily: 'Raleway, sans-serif',
+        }}>
+          <span style={{ fontSize: '12px', color: NAVY, fontWeight: 600 }}>
+            {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
+          </span>
+          <button
+            onClick={clearFilters}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '20px',
+              border: `1px solid ${CORAL}`,
+              background: '#fff',
+              color: CORAL,
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'Raleway, sans-serif',
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      <div className="hostics-table-scroll">
+        <table className="hostics-data-table">
           <thead>
             <tr>
               {showPropertyColumn && (
@@ -131,9 +250,43 @@ export default function ExpenseTable({ expenses }: Props) {
               </th>
               <th style={{ ...thStyle, cursor: 'default', width: '40px' }} aria-label="Edit" />
             </tr>
+            {/* Per-column filter row */}
+            <tr>
+              {showPropertyColumn && (
+                <td style={filterTd}>
+                  <MultiSelectFilter
+                    label="Property"
+                    options={propertyOptions}
+                    selected={fProperty}
+                    onChange={setFProperty}
+                  />
+                </td>
+              )}
+              <td style={filterTd}>
+                <DateRangeFilter value={fDate} onChange={setFDate} />
+              </td>
+              <td style={filterTd}>
+                <TextFilter value={fVendor} onChange={setFVendor} />
+              </td>
+              <td style={filterTd}>
+                <TextFilter value={fDescription} onChange={setFDescription} />
+              </td>
+              <td style={filterTd}>
+                <MultiSelectFilter
+                  label="Category"
+                  options={categoryOptions}
+                  selected={fCategory}
+                  onChange={setFCategory}
+                />
+              </td>
+              <td style={filterTd}>
+                <NumericRangeFilter value={fAmount} onChange={setFAmount} />
+              </td>
+              <td style={filterTd} aria-hidden="true" />
+            </tr>
           </thead>
           <tbody>
-            {sorted.length === 0 && (
+            {total === 0 && (
               <tr>
                 <td
                   colSpan={showPropertyColumn ? 7 : 6}
@@ -145,11 +298,13 @@ export default function ExpenseTable({ expenses }: Props) {
                     fontFamily: 'Raleway, sans-serif',
                   }}
                 >
-                  No expenses in this period
+                  {activeFilterCount > 0
+                    ? 'No expenses match your filters'
+                    : 'No expenses in this period'}
                 </td>
               </tr>
             )}
-            {sorted.map((e, i) => (
+            {visible.map((e, i) => (
               <tr
                 key={e.id}
                 style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFC' }}
@@ -244,6 +399,60 @@ export default function ExpenseTable({ expenses }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* Progressive-rendering footer */}
+      {total > 50 && (
+        <div style={{
+          padding: '12px 24px',
+          borderTop: '1px solid #f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+          fontFamily: 'Raleway, sans-serif',
+        }}>
+          <span style={{ fontSize: '12px', color: '#888' }}>
+            Showing {shown} of {total}
+          </span>
+          {shown < total && (
+            <>
+              <button
+                onClick={() => setVisibleCount(c => c + 50)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: '20px',
+                  border: '1px solid #eee',
+                  background: '#fff',
+                  color: '#555',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'Raleway, sans-serif',
+                }}
+              >
+                Show 50 more
+              </button>
+              <button
+                onClick={() => setVisibleCount(total)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: '20px',
+                  border: `1px solid ${CORAL}`,
+                  background: '#FFF5F4',
+                  color: CORAL,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'Raleway, sans-serif',
+                }}
+              >
+                Show all ({total})
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

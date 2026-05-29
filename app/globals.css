@@ -119,3 +119,14 @@ textarea::placeholder {
   .hostics-grid-4 { grid-template-columns: 1fr; }
   .hostics-main   { padding: 16px; }
 }
+
+/* ── Data tables: horizontal scroll on narrow viewports ─────────── */
+.hostics-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.hostics-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1040px;
+}

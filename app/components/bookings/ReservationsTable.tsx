@@ -1,10 +1,25 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Edit2 } from 'lucide-react'
 import Tooltip from '../Tooltip'
 import { METRIC_DEFS } from '../../../lib/metricDefinitions'
+import {
+  TextFilter,
+  NumericRangeFilter,
+  DateRangeFilter,
+  MultiSelectFilter,
+  matchText,
+  matchNumericRange,
+  matchDateRange,
+  matchMultiSelect,
+  distinctValues,
+  emptyNumericRange,
+  emptyDateRange,
+  type NumericRange,
+  type DateRange,
+} from '../table/TableFilters'
 
 export interface Reservation {
   id: string
@@ -87,6 +102,19 @@ export default function ReservationsTable({ reservations }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [tab, setTab]         = useState<FilterTab>('all')
 
+  // Column filter state
+  const [fProperty, setFProperty] = useState<string[]>([])
+  const [fGuest, setFGuest]       = useState('')
+  const [fCheckIn, setFCheckIn]   = useState<DateRange>(emptyDateRange)
+  const [fCheckOut, setFCheckOut] = useState<DateRange>(emptyDateRange)
+  const [fNights, setFNights]     = useState<NumericRange>(emptyNumericRange)
+  const [fSource, setFSource]     = useState<string[]>([])
+  const [fGross, setFGross]       = useState<NumericRange>(emptyNumericRange)
+  const [fPayout, setFPayout]     = useState<NumericRange>(emptyNumericRange)
+  const [fStatus, setFStatus]     = useState<string[]>([])
+
+  const [visibleCount, setVisibleCount] = useState(50)
+
   const today = new Date().toISOString().slice(0, 10)
 
   const showPropertyColumn = useMemo(
@@ -112,8 +140,37 @@ export default function ReservationsTable({ reservations }: Props) {
     })
   }, [reservations, tab, today])
 
+  // Distinct option lists for the multi-select filters
+  const propertyOptions = useMemo(
+    () => distinctValues(reservations, r => r.property_name),
+    [reservations]
+  )
+  const sourceOptions = useMemo(
+    () => distinctValues(reservations, r => r.booking_source),
+    [reservations]
+  )
+  const statusOptions = useMemo(
+    () => distinctValues(reservations, r => r.status, { caseInsensitive: true }),
+    [reservations]
+  )
+
+  // Column filters: narrow the tab-filtered set before sorting.
+  const columnFiltered = useMemo(() => {
+    return filtered.filter(r =>
+      matchMultiSelect(r.property_name, fProperty) &&
+      matchText(r.guest_name, fGuest) &&
+      matchDateRange(r.check_in, fCheckIn) &&
+      matchDateRange(r.check_out, fCheckOut) &&
+      matchNumericRange(r.nights, fNights) &&
+      matchMultiSelect(r.booking_source, fSource) &&
+      matchNumericRange(r.gross_rent, fGross) &&
+      matchNumericRange(r.owner_payout, fPayout) &&
+      matchMultiSelect(r.status, fStatus, { caseInsensitive: true })
+    )
+  }, [filtered, fProperty, fGuest, fCheckIn, fCheckOut, fNights, fSource, fGross, fPayout, fStatus])
+
   const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
+    return [...columnFiltered].sort((a, b) => {
       let cmp = 0
       if (sortKey === 'gross_rent' || sortKey === 'owner_payout' || sortKey === 'nights') {
         cmp = ((a[sortKey] ?? 0) as number) - ((b[sortKey] ?? 0) as number)
@@ -124,7 +181,42 @@ export default function ReservationsTable({ reservations }: Props) {
       }
       return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [filtered, sortKey, sortDir])
+  }, [columnFiltered, sortKey, sortDir])
+
+  // Active column-filter accounting
+  const rangeActive = (r: NumericRange) => r.min.trim() !== '' || r.max.trim() !== ''
+  const dateActive  = (r: DateRange)  => r.from.trim() !== '' || r.to.trim() !== ''
+  const activeFilterCount =
+    (fProperty.length > 0 ? 1 : 0) +
+    (fGuest.trim() !== '' ? 1 : 0) +
+    (dateActive(fCheckIn) ? 1 : 0) +
+    (dateActive(fCheckOut) ? 1 : 0) +
+    (rangeActive(fNights) ? 1 : 0) +
+    (fSource.length > 0 ? 1 : 0) +
+    (rangeActive(fGross) ? 1 : 0) +
+    (rangeActive(fPayout) ? 1 : 0) +
+    (fStatus.length > 0 ? 1 : 0)
+
+  function clearFilters() {
+    setFProperty([])
+    setFGuest('')
+    setFCheckIn(emptyDateRange)
+    setFCheckOut(emptyDateRange)
+    setFNights(emptyNumericRange)
+    setFSource([])
+    setFGross(emptyNumericRange)
+    setFPayout(emptyNumericRange)
+    setFStatus([])
+  }
+
+  // Reset progressive rendering whenever the result set could change.
+  useEffect(() => {
+    setVisibleCount(50)
+  }, [fProperty, fGuest, fCheckIn, fCheckOut, fNights, fSource, fGross, fPayout, fStatus, tab, sortKey, sortDir])
+
+  const total   = sorted.length
+  const visible = sorted.slice(0, visibleCount)
+  const shown   = visible.length
 
   function SortIcon({ col }: { col: SortKey }) {
     if (col !== sortKey) return <span style={{ opacity: 0.25, marginLeft: '4px' }}>↕</span>
@@ -143,6 +235,13 @@ export default function ReservationsTable({ reservations }: Props) {
     userSelect: 'none',
     fontFamily: 'Raleway, sans-serif',
     whiteSpace: 'nowrap',
+  }
+
+  const filterTd: React.CSSProperties = {
+    padding: '6px 10px',
+    background: '#F7F9FB',
+    borderBottom: '1px solid #e5e9ef',
+    verticalAlign: 'top',
   }
 
   const tabCounts = {
@@ -222,8 +321,41 @@ export default function ReservationsTable({ reservations }: Props) {
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      {/* Active column-filter bar */}
+      {activeFilterCount > 0 && (
+        <div style={{
+          padding: '8px 20px',
+          borderBottom: '1px solid #f0f0f0',
+          background: '#FFF5F4',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          fontFamily: 'Raleway, sans-serif',
+        }}>
+          <span style={{ fontSize: '12px', color: NAVY, fontWeight: 600 }}>
+            {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
+          </span>
+          <button
+            onClick={clearFilters}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '20px',
+              border: `1px solid ${CORAL}`,
+              background: '#fff',
+              color: CORAL,
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'Raleway, sans-serif',
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      <div className="hostics-table-scroll">
+        <table className="hostics-data-table">
           <thead>
             <tr>
               {showPropertyColumn && (
@@ -263,9 +395,58 @@ export default function ReservationsTable({ reservations }: Props) {
               </th>
               <th style={{ ...thBase, cursor: 'default', width: '40px' }} aria-label="Edit" />
             </tr>
+            {/* Per-column filter row */}
+            <tr>
+              {showPropertyColumn && (
+                <td style={filterTd}>
+                  <MultiSelectFilter
+                    label="Property"
+                    options={propertyOptions}
+                    selected={fProperty}
+                    onChange={setFProperty}
+                  />
+                </td>
+              )}
+              <td style={filterTd}>
+                <TextFilter value={fGuest} onChange={setFGuest} />
+              </td>
+              <td style={filterTd}>
+                <DateRangeFilter value={fCheckIn} onChange={setFCheckIn} />
+              </td>
+              <td style={filterTd}>
+                <DateRangeFilter value={fCheckOut} onChange={setFCheckOut} />
+              </td>
+              <td style={filterTd}>
+                <NumericRangeFilter value={fNights} onChange={setFNights} />
+              </td>
+              <td style={filterTd}>
+                <MultiSelectFilter
+                  label="Source"
+                  options={sourceOptions}
+                  selected={fSource}
+                  onChange={setFSource}
+                  renderLabel={displaySource}
+                />
+              </td>
+              <td style={filterTd}>
+                <NumericRangeFilter value={fGross} onChange={setFGross} />
+              </td>
+              <td style={filterTd}>
+                <NumericRangeFilter value={fPayout} onChange={setFPayout} />
+              </td>
+              <td style={filterTd}>
+                <MultiSelectFilter
+                  label="Status"
+                  options={statusOptions}
+                  selected={fStatus}
+                  onChange={setFStatus}
+                />
+              </td>
+              <td style={filterTd} aria-hidden="true" />
+            </tr>
           </thead>
           <tbody>
-            {sorted.length === 0 && (
+            {total === 0 && (
               <tr>
                 <td colSpan={showPropertyColumn ? 10 : 9} style={{
                   padding: '40px',
@@ -274,11 +455,13 @@ export default function ReservationsTable({ reservations }: Props) {
                   fontSize: '14px',
                   fontFamily: 'Raleway, sans-serif',
                 }}>
-                  No reservations found
+                  {activeFilterCount > 0
+                    ? 'No reservations match your filters'
+                    : 'No reservations found'}
                 </td>
               </tr>
             )}
-            {sorted.map((r, i) => (
+            {visible.map((r, i) => (
               <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFC' }}>
                 {showPropertyColumn && (
                   <td style={{
@@ -388,6 +571,60 @@ export default function ReservationsTable({ reservations }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* Progressive-rendering footer */}
+      {total > 50 && (
+        <div style={{
+          padding: '12px 20px',
+          borderTop: '1px solid #f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+          fontFamily: 'Raleway, sans-serif',
+        }}>
+          <span style={{ fontSize: '12px', color: '#888' }}>
+            Showing {shown} of {total}
+          </span>
+          {shown < total && (
+            <>
+              <button
+                onClick={() => setVisibleCount(c => c + 50)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: '20px',
+                  border: '1px solid #eee',
+                  background: '#fff',
+                  color: '#555',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'Raleway, sans-serif',
+                }}
+              >
+                Show 50 more
+              </button>
+              <button
+                onClick={() => setVisibleCount(total)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: '20px',
+                  border: `1px solid ${CORAL}`,
+                  background: '#FFF5F4',
+                  color: CORAL,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'Raleway, sans-serif',
+                }}
+              >
+                Show all ({total})
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
