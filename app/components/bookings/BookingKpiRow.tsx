@@ -93,12 +93,7 @@ export default function BookingKpiRow({
   ]
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(6, 1fr)',
-      gap: '12px',
-      marginBottom: '24px',
-    }}>
+    <div className="hostics-kpi-grid" style={{ marginBottom: '24px' }}>
       {kpis.map((kpi, i) => {
         const hovered = hoveredIdx === i
         return (

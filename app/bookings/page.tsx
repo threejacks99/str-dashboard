@@ -317,12 +317,12 @@ export default async function BookingsPage({
         vsLabel={priorRange?.vsLabel ?? null}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+      <div className="hostics-grid-2" style={{ marginBottom: '16px' }}>
         <BookingsOverTimeChart data={bookingsOverTime} />
         <BookingSourceChart data={bookingsBySource} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+      <div className="hostics-grid-2" style={{ marginBottom: '24px' }}>
         <StayDurationChart data={stayDuration} />
         <DayOfWeekChart data={bookingsByDay} />
       </div>

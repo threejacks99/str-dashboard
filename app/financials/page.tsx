@@ -323,7 +323,7 @@ export default async function FinancialsPage({
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+      <div className="hostics-grid-2" style={{ marginBottom: '24px' }}>
         <NoiTrendChart data={noiTrend} />
         <IncomeBySourceChart data={incomeBySource} />
       </div>

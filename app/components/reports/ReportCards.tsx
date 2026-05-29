@@ -348,7 +348,7 @@ export default function ReportCards({ properties }: Props) {
       </div>
 
       {/* ─── Export cards ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+      <div className="hostics-grid-2" style={{ marginBottom: '20px' }}>
 
         {/* Card 1 — PDF */}
         <div style={{

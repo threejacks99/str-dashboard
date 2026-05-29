@@ -179,6 +179,7 @@ export default function UploadPage() {
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showExpenseModal, setShowExpenseModal] = useState(false)
   const [showCsvSection, setShowCsvSection] = useState(false)
+  const [showNoPropertyModal, setShowNoPropertyModal] = useState(false)
 
   // Properties
   const [properties, setProperties]           = useState<Property[]>([])
@@ -657,7 +658,7 @@ export default function UploadPage() {
       <main style={{ padding: '40px', maxWidth: '960px', fontFamily: 'Raleway, sans-serif' }}>
         <div style={{ width: '140px', height: '28px', background: '#e8eaed', borderRadius: '8px', marginBottom: '12px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
         <div style={{ width: '320px', height: '16px', background: '#e8eaed', borderRadius: '6px', marginBottom: '40px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        <div className="hostics-grid-4">
           {[0,1,2,3].map(i => (
             <div key={i} style={{ height: '180px', background: '#e8eaed', borderRadius: '12px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
           ))}
@@ -675,14 +676,20 @@ export default function UploadPage() {
 
       {/* ── Action cards ────────────────────────────────────────────────────── */}
       {isLocked && <BillingLockScreen />}
-      {!isLocked && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '36px' }}>
+      {!isLocked && <div className="hostics-grid-4" style={{ marginBottom: '36px' }}>
         <ActionCard
           icon="📂"
           title="Upload CSV or Excel"
           description="Bulk import historical data from any platform"
           buttonLabel={showCsvSection ? 'Hide upload' : 'Upload CSV or Excel'}
           active={showCsvSection}
-          onAction={() => setShowCsvSection(v => !v)}
+          onAction={() => {
+            if (!propertiesLoading && properties.length === 0) {
+              setShowNoPropertyModal(true)
+            } else {
+              setShowCsvSection(v => !v)
+            }
+          }}
         />
         <ActionCard
           icon="📅"
@@ -711,22 +718,7 @@ export default function UploadPage() {
       {/* ── File upload section ─────────────────────────────────────────────── */}
       {showCsvSection && (
         <>
-          {properties.length === 0 ? (
-            <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 32px', marginBottom: '24px' }}>
-              <div style={{ fontSize: '40px', marginBottom: '16px' }}>🏠</div>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#0D2C54', marginBottom: '8px' }}>No properties yet</h2>
-              <p style={{ color: '#888', fontSize: '14px', lineHeight: '1.6', maxWidth: '300px', margin: '0 auto 28px' }}>
-                Create your first property before importing data.
-              </p>
-              <Link href="/properties" style={{
-                display: 'inline-block', background: '#FF7767', color: '#fff',
-                textDecoration: 'none', padding: '12px 28px', borderRadius: '8px',
-                fontSize: '15px', fontWeight: '700', fontFamily: 'Raleway, sans-serif',
-              }}>
-                Go to Properties
-              </Link>
-            </div>
-          ) : (
+          {properties.length === 0 ? null : (
             <>
               {/* ── Property selector (single-property mode only) ──────────── */}
               {!multiPropertyMode && <div style={cardStyle}>
@@ -1157,6 +1149,19 @@ export default function UploadPage() {
           onSuccess={() => setShowExpenseModal(false)}
           onCancel={() => setShowExpenseModal(false)}
         />
+      </Modal>
+
+      <Modal isOpen={showNoPropertyModal} onClose={() => setShowNoPropertyModal(false)} title="Add a property first">
+        <div style={{ padding: '24px', textAlign: 'center' }}>
+          <p style={{ color: '#888', fontSize: '14px', marginBottom: '16px' }}>
+            You need at least one property before importing data.
+          </p>
+          <a href="/properties" style={{
+            display: 'inline-block', background: '#FF7767', color: '#fff',
+            padding: '10px 24px', borderRadius: '8px', fontWeight: '700',
+            fontSize: '14px', textDecoration: 'none',
+          }}>Go to Properties</a>
+        </div>
       </Modal>
     </main>
   )

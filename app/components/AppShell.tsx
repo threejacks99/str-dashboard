@@ -25,7 +25,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Header onMenuClick={() => setSidebarOpen(true)} />
           <TrialBanner />
-          <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+          <main className="hostics-main">
             {children}
           </main>
         </div>

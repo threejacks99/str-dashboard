@@ -88,3 +88,34 @@ textarea::placeholder {
   .hostics-hamburger { display: flex; }
   .hostics-header-email { display: none; }
 }
+
+/* ── Responsive content grids (Phase 2) ─────────────────────────── */
+.hostics-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.hostics-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.hostics-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.hostics-main {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .hostics-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .hostics-grid-2 { grid-template-columns: 1fr; }
+  .hostics-grid-4 { grid-template-columns: 1fr; }
+  .hostics-main   { padding: 16px; }
+}
