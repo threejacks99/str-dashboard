@@ -43,3 +43,48 @@ textarea::placeholder {
   color: #B0B0B0;
   font-style: italic;
 }
+
+/* ── App shell: responsive sidebar drawer (Phase 1) ─────────────── */
+.hostics-sidebar {
+  width: 220px;
+  min-height: 100vh;
+  background: #0D2C54;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.hostics-sidebar-overlay { display: none; }
+.hostics-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  color: #0D2C54;
+  padding: 4px 8px;
+  margin-right: 4px;
+}
+
+@media (max-width: 768px) {
+  .hostics-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 0 40px rgba(0,0,0,0.30);
+  }
+  .hostics-sidebar.hostics-sidebar--open { transform: translateX(0); }
+  .hostics-sidebar-overlay--visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 150;
+  }
+  .hostics-hamburger { display: flex; }
+  .hostics-header-email { display: none; }
+}

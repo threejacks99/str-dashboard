@@ -15,7 +15,7 @@ const navItems = [
 
 const ANALYTICS_PATHS = ['/dashboard', '/financials', '/bookings', '/reports']
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname     = usePathname()
   const searchParams = useSearchParams()
 
@@ -26,15 +26,15 @@ export default function Sidebar() {
   }
 
   return (
-    <aside style={{
-      width: '220px',
-      minHeight: '100vh',
-      background: '#0D2C54',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '0',
-      flexShrink: 0,
-    }}>
+    <>
+      {isOpen && (
+        <div
+          className="hostics-sidebar-overlay hostics-sidebar-overlay--visible"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside className={`hostics-sidebar${isOpen ? ' hostics-sidebar--open' : ''}`}>
       {/* Logo area */}
       <div style={{
         padding: '28px 24px 24px',
@@ -93,6 +93,7 @@ export default function Sidebar() {
       }}>
         Hostics © 2025
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

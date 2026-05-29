@@ -32,7 +32,7 @@ function HelpLink() {
   )
 }
 
-export default function Header() {
+export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const router   = useRouter()
   const pathname = usePathname()
   const [email, setEmail] = useState<string | null>(null)
@@ -84,6 +84,7 @@ export default function Header() {
     }}>
       {/* Left: property selector + date range filter */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button className="hostics-hamburger" onClick={onMenuClick} aria-label="Open menu">☰</button>
         {['/dashboard', '/financials', '/bookings'].includes(pathname) && (
           <>
             <Suspense fallback={null}>
@@ -100,7 +101,7 @@ export default function Header() {
       {email && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <HelpLink />
-          <span style={{ fontSize: '13px', color: '#666' }}>{email}</span>
+          <span className="hostics-header-email" style={{ fontSize: '13px', color: '#666' }}>{email}</span>
 
           {/* Avatar + dropdown */}
           <div ref={dropdownRef} style={{ position: 'relative' }}>

@@ -150,15 +150,11 @@ function Navbar() {
               {label}
             </a>
           ))}
-          <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
-            <Link href="/login" style={{ fontSize: '15px', fontWeight: '600', color: NAVY, textDecoration: 'none' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+            <Link href="/login" style={{ fontSize: '15px', fontWeight: '600', color: NAVY, textDecoration: 'none', textAlign: 'center', padding: '10px' }}>
               Sign In
             </Link>
-            <Link href="/login?signup=1" style={{
-              background: CORAL, color: '#fff', padding: '10px 20px',
-              borderRadius: '8px', fontSize: '14px', fontWeight: '700',
-              textDecoration: 'none',
-            }}>
+            <Link href="/login?signup=1" style={{ background: CORAL, color: '#fff', padding: '12px 20px', borderRadius: '8px', fontSize: '15px', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}>
               Start Free Trial
             </Link>
           </div>
