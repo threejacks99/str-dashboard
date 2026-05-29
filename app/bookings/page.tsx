@@ -154,16 +154,39 @@ function EmptyState() {
     }}>
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
       <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
+        Set up your first property
+      </h2>
+      <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
+        Add a property to start tracking your reservations.
+      </p>
+      <Link href="/properties" style={{
+        background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
+        fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
+      }}>
+        Add your first property
+      </Link>
+    </div>
+  )
+}
+
+function NoDataState() {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
         No bookings yet
       </h2>
       <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
-        Upload your first CSV or Excel file to see your reservation data.
+        Your property is set up. Import your reservations to see booking trends.
       </p>
       <Link href="/upload" style={{
         background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
         fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
-        Upload data
+        Add your data
       </Link>
     </div>
   )
@@ -226,6 +249,17 @@ export default async function BookingsPage({
           .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
       : Promise.resolve({ data: null }),
   ])
+
+  // ── Account-scoped empty check ──────────────────────────────────────────────
+  // The fetch above is date-range-scoped. If it returned nothing, confirm the
+  // account truly has no reservations (ignoring the date filter) before
+  // prompting — otherwise a user with data outside the active range is wrongly
+  // shown it.
+  if ((reservations ?? []).length === 0) {
+    const { data: anyRes } = await supabase
+      .from('reservations').select('id').in('property_id', effectivePropertyIds).limit(1)
+    if ((anyRes ?? []).length === 0) return <NoDataState />
+  }
 
   const allRes = reservations ?? []
   const kpis   = buildKpis(allRes)

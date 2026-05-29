@@ -132,6 +132,8 @@ function ActionCard({
       display: 'flex',
       flexDirection: 'column',
       gap: '12px',
+      alignItems: 'center',
+      textAlign: 'center',
       transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
     }}>
       <div style={{ fontSize: '32px', lineHeight: 1 }}>{icon}</div>
@@ -147,7 +149,7 @@ function ActionCard({
         <span style={{
           display: 'inline-block', background: '#F0F4F9', color: '#0D2C54',
           borderRadius: '20px', padding: '4px 14px', fontSize: '12px', fontWeight: '600',
-          alignSelf: 'flex-start',
+          alignSelf: 'center',
         }}>
           Coming soon
         </span>
@@ -156,7 +158,7 @@ function ActionCard({
           onClick={onAction}
           disabled={disabled}
           style={{
-            alignSelf: 'flex-start',
+            alignSelf: 'center',
             background: disabled ? '#f0f0f0' : '#FF7767',
             color: disabled ? '#aaa' : '#fff',
             border: 'none', borderRadius: '8px',

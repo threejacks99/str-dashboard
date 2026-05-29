@@ -19,16 +19,16 @@ function EmptyState() {
     }}>
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
       <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>
-        No data to export yet
+        Set up your first property
       </h2>
       <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
-        Upload your first CSV or Excel file to generate tax-ready reports.
+        Add a property before generating reports.
       </p>
-      <Link href="/upload" style={{
+      <Link href="/properties" style={{
         background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
         fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
-        Upload data
+        Add your first property
       </Link>
     </div>
   )

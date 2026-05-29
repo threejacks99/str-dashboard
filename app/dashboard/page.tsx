@@ -159,13 +159,28 @@ function EmptyState() {
         Welcome to Hostics!
       </h2>
       <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
-        You don't have any data yet. Upload your first CSV or Excel file to get started.
+        Start by adding your first property — then you can import bookings and expenses.
       </p>
-      <Link href="/upload" style={{
+      <Link href="/properties" style={{
         background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px',
         fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif',
       }}>
-        Upload your first file
+        Add your first property
+      </Link>
+    </div>
+  )
+}
+
+function NoDataState() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center' }}>
+      <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0D2C54', marginBottom: '8px' }}>No data yet</h2>
+      <p style={{ color: '#888', fontSize: '15px', marginBottom: '28px', maxWidth: '340px', lineHeight: '1.6' }}>
+        Your property is set up. Import your bookings and expenses to see your numbers.
+      </p>
+      <Link href="/upload" style={{ background: '#FF7767', color: '#fff', padding: '12px 28px', borderRadius: '8px', fontSize: '15px', fontWeight: '700', textDecoration: 'none', fontFamily: 'Raleway, sans-serif' }}>
+        Add your data
       </Link>
     </div>
   )
@@ -244,6 +259,18 @@ export default async function DashboardPage({
           .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
       : Promise.resolve({ data: null }),
   ])
+
+  // ── Account-scoped empty check ──────────────────────────────────────────────
+  // The fetch above is date-range-scoped. If it returned nothing, confirm the
+  // account truly has no data (ignoring the date filter) before prompting —
+  // otherwise a user with data outside the active range is wrongly shown it.
+  if ((reservations ?? []).length === 0 && (expenses ?? []).length === 0) {
+    const [{ data: anyRes }, { data: anyExp }] = await Promise.all([
+      supabase.from('reservations').select('id').in('property_id', effectivePropertyIds).limit(1),
+      supabase.from('expenses').select('id').in('property_id', effectivePropertyIds).limit(1),
+    ])
+    if ((anyRes ?? []).length === 0 && (anyExp ?? []).length === 0) return <NoDataState />
+  }
 
   // ── Compute KPIs ──────────────────────────────────────────────────────────
   const current = computeKpis(reservations ?? [], expenses ?? [], effectiveDays)
