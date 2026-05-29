@@ -137,3 +137,10 @@ textarea::placeholder {
 @media (max-width: 768px) {
   .hostics-form-grid, .hostics-form-grid-3 { grid-template-columns: 1fr; }
 }
+
+/* ── Landing footer columns: center on mobile ───────────────────── */
+@media (max-width: 768px) {
+  .hostics-footer-cols { text-align: center; }
+  .hostics-footer-cols .hostics-footer-brand { margin-left: auto; margin-right: auto; }
+  .hostics-footer-cols img { margin-left: auto; margin-right: auto; }
+}

@@ -692,6 +692,48 @@ function TestimonialsSection() {
   )
 }
 
+// ── SECTION: About ─────────────────────────────────────────────────────────────
+function AboutSection() {
+  return (
+    <section id="about" style={{ background: '#fff', padding: '96px 32px' }}>
+      <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+        <FadeIn>
+          <h2 style={{ fontSize: '32px', fontWeight: '800', color: NAVY, marginBottom: '28px', lineHeight: '1.25' }}>
+            Why Hostics exists
+          </h2>
+          <p style={{ fontSize: '20px', color: '#555', lineHeight: '1.7', marginBottom: '24px' }}>
+            Hostics started with a spreadsheet that got out of hand — but it didn&apos;t stay there.
+          </p>
+          <p style={{ fontSize: '17px', color: '#666', lineHeight: '1.75', marginBottom: '24px' }}>
+            Like a lot of short-term rental owners, I was running my rental off a patchwork of
+            platform dashboards, exported CSVs, and a financial tracker that grew more tangled every
+            month. Airbnb told me one number, my bank told me another, and at tax time I was
+            reverse-engineering a year of payouts trying to figure out what I&apos;d actually earned.
+          </p>
+          <p style={{ fontSize: '17px', color: '#666', lineHeight: '1.75', marginBottom: '24px' }}>
+            The tools built for large property managers were overkill — priced and designed for
+            someone running fifty doors, not someone trying to genuinely understand their portfolio.
+            The simpler tools didn&apos;t go deep enough to answer the question that actually
+            mattered: <em>is this rental making money, and where is it leaking?</em>
+          </p>
+          <p style={{ fontSize: '17px', color: '#666', lineHeight: '1.75', marginBottom: '24px' }}>
+            So I built the platform I wished existed — and built it properly. Hostics brings bookings
+            and expenses into one place, calculates true net operating income, and turns a year of
+            scattered payouts into tax-ready reporting. It&apos;s the financial clarity that used to
+            take an accountant or enterprise software, built by someone who actually lives in the
+            same numbers you do.
+          </p>
+          <p style={{ fontSize: '17px', color: '#666', lineHeight: '1.75', margin: 0 }}>
+            Hostics is for owners who treat their rentals like the business they are. Whether
+            that&apos;s one property or a growing portfolio, the goal is the same: know exactly how
+            you&apos;re doing, and make better decisions because of it.
+          </p>
+        </FadeIn>
+      </div>
+    </section>
+  )
+}
+
 // ── SECTION 7: FAQ ─────────────────────────────────────────────────────────────
 const FAQ_ITEMS = [
   {
@@ -821,7 +863,7 @@ function Footer() {
   return (
     <footer style={{ background: DARK_NAVY, padding: '64px 32px 32px' }}>
       <div style={{ maxWidth: '1140px', margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '40px', marginBottom: '48px' }}>
+        <div className="hostics-footer-cols" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '40px', marginBottom: '48px' }}>
           {/* Brand */}
           <div style={{ gridColumn: 'span 1' }}>
             <Image
@@ -831,7 +873,7 @@ function Footer() {
               height={37}
               style={{ height: 'auto', display: 'block', marginBottom: '14px' }}
             />
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.65', maxWidth: '220px' }}>
+            <p className="hostics-footer-brand" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.65', maxWidth: '220px' }}>
               The analytics dashboard for short-term rental owners.
             </p>
           </div>
@@ -844,7 +886,7 @@ function Footer() {
             {[
               { label: 'Features', href: '#features' },
               { label: 'Pricing',  href: '#pricing' },
-              { label: 'Help Center', href: '/help' },
+              { label: 'FAQ', href: '#faq' },
             ].map(l => (
               <a key={l.label} href={l.href} style={{ display: 'block', fontSize: '14px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none', marginBottom: '10px', transition: 'color 0.15s' }}
                 className="landing-footer-link">
@@ -859,7 +901,7 @@ function Footer() {
               Company
             </div>
             {[
-              { label: 'About',   href: '#' },
+              { label: 'About',   href: '#about' },
               { label: 'Contact', href: 'mailto:hello@hostics.app' },
             ].map(l => (
               <a key={l.label} href={l.href} style={{ display: 'block', fontSize: '14px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none', marginBottom: '10px' }}
@@ -875,8 +917,8 @@ function Footer() {
               Legal
             </div>
             {[
-              { label: 'Privacy', href: '#' },
-              { label: 'Terms',   href: '#' },
+              { label: 'Privacy', href: '/privacy' },
+              { label: 'Terms',   href: '/terms' },
             ].map(l => (
               <a key={l.label} href={l.href} style={{ display: 'block', fontSize: '14px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none', marginBottom: '10px' }}
                 className="landing-footer-link">
@@ -988,6 +1030,7 @@ export default function LandingPage() {
           <PricingSection />
           <TestimonialsSection />
           <FaqSection />
+          <AboutSection />
           <CtaSection />
         </main>
         <Footer />

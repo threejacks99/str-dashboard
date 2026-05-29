@@ -7,7 +7,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import TrialBanner from './TrialBanner'
 
-const PUBLIC_ROUTES = ['/', '/login']
+const PUBLIC_ROUTES = ['/', '/login', '/privacy', '/terms']
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
