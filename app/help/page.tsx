@@ -61,6 +61,10 @@ function CategoryCard({ emoji, name, description, slug }: typeof CATEGORIES[numb
           border: '1px solid #eee',
           cursor: 'pointer',
           height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
         }}
       >
         <div style={{ fontSize: '36px', marginBottom: '12px', lineHeight: 1 }}>{emoji}</div>
@@ -141,7 +145,7 @@ export default function HelpPage() {
   return (
     <div style={{ maxWidth: '900px' }}>
       {/* Hero */}
-      <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+      <div style={{ marginBottom: '40px' }}>
         <h1 style={{
           fontSize: '32px',
           fontWeight: 800,
