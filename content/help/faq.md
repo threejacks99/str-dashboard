@@ -39,7 +39,7 @@ Hostics uses your **owner payout** — what you actually receive after platform 
 
 ### Does Hostics show occupancy rate?
 
-Not yet. A true occupancy rate needs each property's available-nights calendar, which Hostics doesn't currently track. **Total Nights** on the Bookings page is the closest indicator for now, and occupancy is on our roadmap. [Booking metrics explained](/help/understanding-booking-metrics).
+Yes — your **Dashboard** shows an occupancy rate (booked nights ÷ available nights) alongside average daily rate. One caveat: occupancy currently assumes each property was available for the entire date range, so a seasonal or recently-acquired property can read lower than its true figure. [How metrics are calculated](/help/understanding-booking-metrics).
 
 ### Is my data secure?
 

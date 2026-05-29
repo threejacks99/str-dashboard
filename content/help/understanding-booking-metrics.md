@@ -51,6 +51,24 @@ The share of reservations that were cancelled. This is the one metric that *incl
 - **Bookings by source** — the channel mix (Airbnb, direct, and so on) behind your reservations.
 - **Day of week** — which check-in days are most common, by the weekday of each booking's check-in.
 
-## A note on occupancy rate
+## Occupancy Rate and Average Daily Rate (on your Dashboard)
 
-Hostics doesn't currently show a true occupancy *rate* (booked nights ÷ available nights), because that requires tracking each property's available calendar, which Hostics doesn't yet capture. **Total Nights** is the closest stand-in for how much your calendar is working. A proper occupancy metric is on our roadmap.
+Two more metrics appear on your **Dashboard** rather than the Bookings page:
+
+**Average Daily Rate (ADR)**
+
+```
+Total gross rent ÷ Total nights
+```
+
+Your average nightly rate across confirmed stays, based on the gross booking amount. It tells you what a night is worth before fees and expenses.
+
+**Occupancy Rate**
+
+```
+Booked nights ÷ Available nights × 100
+```
+
+The share of your available calendar that was booked, across the selected date range and property filter.
+
+> **One thing to know about occupancy:** Hostics currently treats every property as available for *every day* of the date range you've selected. It doesn't yet account for when a property was actually listed — so a rental you bought partway through the year, or one you only list seasonally, will show a **lower** occupancy than its true figure, because the months it wasn't available are still counted as empty nights. For a property that's been listed the whole period, the number is accurate. We're planning to refine this with per-property availability dates. In the meantime, occupancy is most reliable over date ranges where the property was actually live, and **Total Nights** is a clean, assumption-free measure of how much your calendar is working.
