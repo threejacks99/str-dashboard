@@ -12,6 +12,8 @@ import ReservationForm from '../components/ReservationForm'
 import ExpenseForm from '../components/ExpenseForm'
 import { useBillingStatus } from '../../lib/useBillingStatus'
 import BillingLockScreen from '../components/BillingLockScreen'
+import ConflictResolutionModal from '../components/ConflictResolutionModal'
+import { findConflicts, type Conflict, type ConflictReservation } from '../../lib/conflicts'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Property {
@@ -216,6 +218,11 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadResult, setUploadResult]     = useState<{ imported: number; duplicatesSkipped: number; kind: string } | null>(null)
   const [uploadError, setUploadError]       = useState<string | null>(null)
+
+  // Booking-conflict resolution
+  const [conflicts, setConflicts]                 = useState<Conflict[]>([])
+  const [showConflictModal, setShowConflictModal] = useState(false)
+  const [resolvingConflicts, setResolvingConflicts] = useState(false)
 
   // History
   const [uploadHistory, setUploadHistory] = useState<UploadHistoryRow[]>([])
@@ -602,14 +609,19 @@ export default function UploadPage() {
       })
 
       let imported = 0
+      const insertedIds: string[] = []
       for (let i = 0; i < withId.length; i += BATCH_SIZE) {
         const batch = withId.slice(i, i + BATCH_SIZE)
-        const { error } = await supabase.from(table).insert(batch)
-        if (error) throw new Error(friendlyError(error.message))
-        imported += batch.length
-        if (withId.length > 100) {
-          setUploadProgress(Math.round((imported / withId.length) * 100))
+        if (table === 'reservations') {
+          const { data, error } = await supabase.from(table).insert(batch).select('id')
+          if (error) throw new Error(friendlyError(error.message))
+          for (const r of (data ?? [])) insertedIds.push(r.id)
+        } else {
+          const { error } = await supabase.from(table).insert(batch)
+          if (error) throw new Error(friendlyError(error.message))
         }
+        imported += batch.length
+        if (withId.length > 100) setUploadProgress(Math.round((imported / withId.length) * 100))
       }
 
       const uploadPropertyId = multiPropertyMode
@@ -628,6 +640,9 @@ export default function UploadPage() {
         kind: fileType === 'expenses' ? 'expense' : 'reservation',
       })
 
+      const isReservations = table === 'reservations'
+      const affectedIds = Array.from(new Set(withId.map(r => r.property_id).filter(Boolean))) as string[]
+
       setValidRows([])
       setReadyRows([])
       setInvalidRows([])
@@ -640,12 +655,48 @@ export default function UploadPage() {
       setUnknownPropertyNames([])
       setUnknownMappings({})
       if (fileInputRef.current) fileInputRef.current.value = ''
+
+      if (isReservations && insertedIds.length && affectedIds.length) {
+        try {
+          const { data } = await supabase
+            .from('reservations')
+            .select('id, guest_name, check_in, check_out, booking_source, gross_rent, reservation_ref, property_id, status')
+            .in('property_id', affectedIds)
+          const nameById: Record<string, string> = {}
+          for (const p of properties) nameById[p.id] = p.name
+          const rows: ConflictReservation[] = (data ?? []).map((r: any) => ({
+            ...r,
+            property_name: r.property_id ? (nameById[r.property_id] ?? null) : null,
+          }))
+          const found = findConflicts(rows, new Set(insertedIds))
+          if (found.length) {
+            setConflicts(found)
+            setShowConflictModal(true)
+          }
+        } catch {
+          // best-effort annotation step; import already succeeded, so swallow
+        }
+      }
     } catch (err: any) {
       setUploadError(err.message ?? 'Upload failed. Please try again.')
     }
 
     setUploading(false)
     setUploadProgress(0)
+  }
+
+  // ── Conflict resolution ─────────────────────────────────────────────────────
+  async function handleResolveConflicts(cancelledIds: string[]) {
+    if (!cancelledIds.length) { setShowConflictModal(false); setConflicts([]); return }
+    setResolvingConflicts(true)
+    const { error } = await supabase
+      .from('reservations')
+      .update({ status: 'Cancelled' })
+      .in('id', cancelledIds)
+    setResolvingConflicts(false)
+    if (error) { setUploadError(friendlyError(error.message)); return }
+    setShowConflictModal(false)
+    setConflicts([])
   }
 
   // ── Derived values ────────────────────────────────────────────────────────────
@@ -1165,6 +1216,15 @@ export default function UploadPage() {
           }}>Go to Properties</a>
         </div>
       </Modal>
+
+      {showConflictModal && conflicts.length > 0 && (
+        <ConflictResolutionModal
+          conflicts={conflicts}
+          resolving={resolvingConflicts}
+          onResolve={handleResolveConflicts}
+          onClose={() => setShowConflictModal(false)}
+        />
+      )}
     </main>
   )
 }
