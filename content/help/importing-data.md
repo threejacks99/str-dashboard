@@ -10,6 +10,7 @@ A few things that apply to every import:
 - **Dates are flexible.** `2024-12-21`, `12/21/2024`, `21/12/2024`, and `Dec 21, 2024` all parse correctly.
 - **Amounts can include `$` and commas.** `$1,250.00` reads the same as `1250`.
 - **Re-importing is safe.** Hostics de-duplicates, so uploading an updated file won't create double entries. (One exception worth knowing about for expenses — see [Common issues](/help/common-issues).)
+- **Overlapping bookings are flagged.** If an import leaves two bookings on the same property with overlapping dates, Hostics prompts you to mark one as cancelled on the spot. See [Handling cancellations](/help/handling-cancellations).
 
 Pick your source for step-by-step instructions:
 

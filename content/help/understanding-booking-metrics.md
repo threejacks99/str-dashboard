@@ -44,6 +44,8 @@ Cancelled bookings ÷ all non-owner bookings × 100
 
 The share of reservations that were cancelled. This is the one metric that *includes* cancelled bookings in its math — because measuring them is the whole point. A climbing rate can signal pricing, listing-accuracy, or guest-quality issues worth investigating.
 
+Cancellations are recorded inside Hostics rather than imported from your file — see [Handling cancellations](/help/handling-cancellations) for how a booking gets marked cancelled, both automatically on import and by hand.
+
 ## The charts
 
 - **Bookings over time** — confirmed bookings per month, for spotting seasonality.
