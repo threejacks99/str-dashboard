@@ -75,7 +75,9 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span style={{ color: '#aaa' }}>—</span>
-  const style = STATUS_COLORS[status] ?? { bg: '#F0F4F9', color: '#0D2C54' }
+  const normalized = (status ?? '').toLowerCase()
+  const match = Object.entries(STATUS_COLORS).find(([key]) => key.toLowerCase() === normalized)
+  const style = match ? match[1] : { bg: '#F0F4F9', color: '#0D2C54' }
   return (
     <span style={{
       background: style.bg,
@@ -249,7 +251,7 @@ export default function ReservationsTable({ reservations }: Props) {
     all:       reservations.length,
     upcoming:  reservations.filter(r => (r.check_in ?? '') > today).length,
     past:      reservations.filter(r => (r.check_out ?? '') < today).length,
-    cancelled: reservations.filter(r => r.status === 'cancelled' || r.status === 'Cancelled').length,
+    cancelled: reservations.filter(r => isCancelled(r)).length,
   }
 
   const tabs: { key: FilterTab; label: string }[] = [
