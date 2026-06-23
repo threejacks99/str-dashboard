@@ -20,11 +20,11 @@ export interface Conflict {
 }
 
 export function isCancelledStatus(s: string | null): boolean {
-  return s === 'cancelled' || s === 'Cancelled'
+  return /cancel/i.test(s ?? '')
 }
 
 export function isOwnerSource(s: string | null): boolean {
-  return s === 'OWN' || s === 'Own' || s === 'own'
+  return /^own/i.test((s ?? '').trim())
 }
 
 // Strict intersection: same-day turnover (one checks out the day the next

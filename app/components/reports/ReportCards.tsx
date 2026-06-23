@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import { useBillingStatus } from '../../../lib/useBillingStatus'
 import { getFeatures } from '../../../lib/billing'
 import { fetchAll } from '../../../lib/supabaseFetch'
+import { isCancelled, isOwnerStay } from '../../../lib/reservations'
 import type { ReportData, ScheduleELine } from './TaxSummaryPDF'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,9 +38,7 @@ function buildReportData(
   rawRes: any[],
   rawExp: any[],
 ): ReportData {
-  const isOwner     = (r: any) => ['OWN', 'Own', 'own'].includes(r.booking_source)
-  const isCancelled = (r: any) => ['cancelled', 'Cancelled'].includes(r.status)
-  const perf = rawRes.filter(r => !isOwner(r) && !isCancelled(r))
+  const perf = rawRes.filter(r => !isOwnerStay(r) && !isCancelled(r))
 
   // Income
   const srcMap: Record<string, number> = {}

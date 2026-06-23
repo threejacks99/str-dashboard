@@ -9,7 +9,7 @@
  * same logic under the name `isOwner`).
  */
 export function isOwnerStay(r: any): boolean {
-  return ['OWN', 'Own', 'own'].includes(r.booking_source)
+  return /^own/i.test((r.booking_source ?? '').trim())
 }
 
 /**
@@ -19,7 +19,7 @@ export function isOwnerStay(r: any): boolean {
  * inlined in ReservationsTable.tsx's tab filter).
  */
 export function isCancelled(r: any): boolean {
-  return ['cancelled', 'Cancelled'].includes(r.status)
+  return /cancel/i.test(r.status ?? '')
 }
 
 /**
