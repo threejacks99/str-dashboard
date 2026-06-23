@@ -14,6 +14,7 @@ import DayOfWeekChart from '../components/dashboard/DayOfWeekChart'
 import BookingsHeader from '../components/bookings/BookingsHeader'
 import { getDateRangeFromParams, getPriorDateRange } from '../../lib/dateRanges'
 import { isCancelled, isOwnerStay, resolvePropertyFilter } from '../../lib/reservations'
+import { fetchAll } from '../../lib/supabaseFetch'
 
 function buildKpis(reservations: any[]): BookingKpis {
   const nonOwner  = reservations.filter(r => !isOwnerStay(r))
@@ -117,11 +118,17 @@ export default async function BookingsPage({
     { data: reservations },
     { data: priorReservations },
   ] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
-      .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
+    fetchAll((pageFrom, pageTo) =>
+      supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
+        .gte('check_in', dateRange.from).lte('check_in', dateRange.to)
+        .order('id', { ascending: true }).range(pageFrom, pageTo)
+    ),
     priorRange
-      ? supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
-          .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
+      ? fetchAll((pageFrom, pageTo) =>
+          supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
+            .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
+            .order('id', { ascending: true }).range(pageFrom, pageTo)
+        )
       : Promise.resolve({ data: null }),
   ])
 

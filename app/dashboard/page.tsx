@@ -9,6 +9,7 @@ import type { PriorKpis } from '../components/dashboard/KpiCards'
 import RevenueChart from '../components/dashboard/RevenueChart'
 import { daysBetween, getDateRangeFromParams, getPriorDateRange } from '../../lib/dateRanges'
 import { isCancelled, isOwnerStay, resolvePropertyFilter } from '../../lib/reservations'
+import { fetchAll } from '../../lib/supabaseFetch'
 
 // ── KPI computation ───────────────────────────────────────────────────────────
 function computeKpis(reservations: any[], expenses: any[], days: number) {
@@ -124,17 +125,29 @@ export default async function DashboardPage({
     { data: priorReservations },
     { data: priorExpenses },
   ] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
-      .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
-    supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
-      .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to),
+    fetchAll((pageFrom, pageTo) =>
+      supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
+        .gte('check_in', dateRange.from).lte('check_in', dateRange.to)
+        .order('id', { ascending: true }).range(pageFrom, pageTo)
+    ),
+    fetchAll((pageFrom, pageTo) =>
+      supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
+        .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to)
+        .order('id', { ascending: true }).range(pageFrom, pageTo)
+    ),
     priorRange
-      ? supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
-          .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
+      ? fetchAll((pageFrom, pageTo) =>
+          supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
+            .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
+            .order('id', { ascending: true }).range(pageFrom, pageTo)
+        )
       : Promise.resolve({ data: null }),
     priorRange
-      ? supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
-          .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
+      ? fetchAll((pageFrom, pageTo) =>
+          supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
+            .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
+            .order('id', { ascending: true }).range(pageFrom, pageTo)
+        )
       : Promise.resolve({ data: null }),
   ])
 

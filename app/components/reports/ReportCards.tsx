@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { useBillingStatus } from '../../../lib/useBillingStatus'
 import { getFeatures } from '../../../lib/billing'
+import { fetchAll } from '../../../lib/supabaseFetch'
 import type { ReportData, ScheduleELine } from './TaxSummaryPDF'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -226,10 +227,14 @@ export default function ReportCards({ properties }: Props) {
       : [selectedPropertyId]
 
     const [{ data: reservations }, { data: expenses }] = await Promise.all([
-      supabase.from('reservations').select('*')
-        .in('property_id', ids).gte('check_in', from).lte('check_in', to),
-      supabase.from('expenses').select('*')
-        .in('property_id', ids).gte('paid_date', from).lte('paid_date', to),
+      fetchAll((pageFrom, pageTo) =>
+        supabase.from('reservations').select('*')
+          .in('property_id', ids).gte('check_in', from).lte('check_in', to)
+          .order('id', { ascending: true }).range(pageFrom, pageTo)),
+      fetchAll((pageFrom, pageTo) =>
+        supabase.from('expenses').select('*')
+          .in('property_id', ids).gte('paid_date', from).lte('paid_date', to)
+          .order('id', { ascending: true }).range(pageFrom, pageTo)),
     ])
     return { reservations: reservations ?? [], expenses: expenses ?? [] }
   }

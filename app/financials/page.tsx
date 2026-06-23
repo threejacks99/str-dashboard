@@ -13,6 +13,7 @@ import ExpenseTable from '../components/financials/ExpenseTable'
 import FinancialsHeader from '../components/financials/FinancialsHeader'
 import { getDateRangeFromParams, getPriorDateRange } from '../../lib/dateRanges'
 import { isCancelled, isOwnerStay, resolvePropertyFilter } from '../../lib/reservations'
+import { fetchAll } from '../../lib/supabaseFetch'
 
 const SOURCE_NAMES: Record<string, string> = {
   'SC-ABnB':  'Airbnb',
@@ -131,17 +132,29 @@ export default async function FinancialsPage({
     { data: priorReservations },
     { data: priorExpenses },
   ] = await Promise.all([
-    supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
-      .gte('check_in', dateRange.from).lte('check_in', dateRange.to),
-    supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
-      .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to),
+    fetchAll((pageFrom, pageTo) =>
+      supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
+        .gte('check_in', dateRange.from).lte('check_in', dateRange.to)
+        .order('id', { ascending: true }).range(pageFrom, pageTo)
+    ),
+    fetchAll((pageFrom, pageTo) =>
+      supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
+        .gte('paid_date', dateRange.from).lte('paid_date', dateRange.to)
+        .order('id', { ascending: true }).range(pageFrom, pageTo)
+    ),
     priorRange
-      ? supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
-          .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
+      ? fetchAll((pageFrom, pageTo) =>
+          supabase.from('reservations').select('*').in('property_id', effectivePropertyIds)
+            .gte('check_in', priorRange.from).lte('check_in', priorRange.to)
+            .order('id', { ascending: true }).range(pageFrom, pageTo)
+        )
       : Promise.resolve({ data: null }),
     priorRange
-      ? supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
-          .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
+      ? fetchAll((pageFrom, pageTo) =>
+          supabase.from('expenses').select('*').in('property_id', effectivePropertyIds)
+            .gte('paid_date', priorRange.from).lte('paid_date', priorRange.to)
+            .order('id', { ascending: true }).range(pageFrom, pageTo)
+        )
       : Promise.resolve({ data: null }),
   ])
 
