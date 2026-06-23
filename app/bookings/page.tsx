@@ -13,14 +13,7 @@ import BookingSourceChart from '../components/dashboard/BookingSourceChart'
 import DayOfWeekChart from '../components/dashboard/DayOfWeekChart'
 import BookingsHeader from '../components/bookings/BookingsHeader'
 import { getDateRangeFromParams, getPriorDateRange } from '../../lib/dateRanges'
-
-// ── Reservation helpers ────────────────────────────────────────────────────────
-function isOwnerStay(r: any): boolean {
-  return ['OWN', 'Own', 'own'].includes(r.booking_source)
-}
-function isCancelled(r: any): boolean {
-  return ['cancelled', 'Cancelled'].includes(r.status)
-}
+import { isCancelled, isOwnerStay, resolvePropertyFilter } from '../../lib/reservations'
 
 function buildKpis(reservations: any[]): BookingKpis {
   const nonOwner  = reservations.filter(r => !isOwnerStay(r))
@@ -117,23 +110,7 @@ export default async function BookingsPage({
   if (!allPropertyIds.length) return <EmptyState />
 
   // ── Resolve property filter ────────────────────────────────────────────────
-  const propertyParam = params.property
-  let effectivePropertyIds: string[]
-  let propertyLabel: string
-
-  if (propertyParam && propertyParam !== 'all') {
-    const match = (properties ?? []).find((p: any) => p.id === propertyParam)
-    if (match) {
-      effectivePropertyIds = [propertyParam]
-      propertyLabel = (match as any).name
-    } else {
-      effectivePropertyIds = allPropertyIds
-      propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
-    }
-  } else {
-    effectivePropertyIds = allPropertyIds
-    propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
-  }
+  const { effectivePropertyIds, propertyLabel } = resolvePropertyFilter(properties, params.property)
 
   // ── Fetch data ────────────────────────────────────────────────────────────
   const [

@@ -8,11 +8,10 @@ import KpiCards from '../components/dashboard/KpiCards'
 import type { PriorKpis } from '../components/dashboard/KpiCards'
 import RevenueChart from '../components/dashboard/RevenueChart'
 import { daysBetween, getDateRangeFromParams, getPriorDateRange } from '../../lib/dateRanges'
+import { isCancelled, isOwnerStay, resolvePropertyFilter } from '../../lib/reservations'
 
 // ── KPI computation ───────────────────────────────────────────────────────────
 function computeKpis(reservations: any[], expenses: any[], days: number) {
-  const isOwnerStay = (r: any) => ['OWN', 'Own', 'own'].includes(r.booking_source)
-  const isCancelled = (r: any) => ['cancelled', 'Cancelled'].includes(r.status)
   const perf = reservations.filter(r => !isOwnerStay(r) && !isCancelled(r))
 
   const totalIncome    = reservations.filter(r => !isOwnerStay(r)).reduce((s, r) => s + (r.owner_payout || 0), 0)
@@ -110,24 +109,7 @@ export default async function DashboardPage({
   if (!allPropertyIds.length) return <EmptyState />
 
   // ── Resolve property filter ────────────────────────────────────────────────
-  const propertyParam = params.property
-  let effectivePropertyIds: string[]
-  let propertyLabel: string
-
-  if (propertyParam && propertyParam !== 'all') {
-    const match = (properties ?? []).find((p: any) => p.id === propertyParam)
-    if (match) {
-      effectivePropertyIds = [propertyParam]
-      propertyLabel = (match as any).name
-    } else {
-      // Unknown or inaccessible property — fall back to all
-      effectivePropertyIds = allPropertyIds
-      propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
-    }
-  } else {
-    effectivePropertyIds = allPropertyIds
-    propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
-  }
+  const { effectivePropertyIds, propertyLabel } = resolvePropertyFilter(properties, params.property)
 
   // Occupancy denominator: available nights = filter window × property count
   const baseDays       = daysBetween(dateRange.from, dateRange.to)

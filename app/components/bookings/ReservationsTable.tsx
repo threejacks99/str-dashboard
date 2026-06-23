@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Edit2 } from 'lucide-react'
 import Tooltip from '../Tooltip'
 import { METRIC_DEFS } from '../../../lib/metricDefinitions'
+import { isCancelled } from '../../../lib/reservations'
 import {
   TextFilter,
   NumericRangeFilter,
@@ -133,7 +134,7 @@ export default function ReservationsTable({ reservations }: Props) {
 
   const filtered = useMemo(() => {
     return reservations.filter(r => {
-      if (tab === 'cancelled') return r.status === 'cancelled' || r.status === 'Cancelled'
+      if (tab === 'cancelled') return isCancelled(r)
       if (tab === 'upcoming')  return (r.check_in ?? '') > today
       if (tab === 'past')      return (r.check_out ?? '') < today
       return true

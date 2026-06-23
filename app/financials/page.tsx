@@ -12,19 +12,12 @@ import ExpensesChart from '../components/dashboard/ExpensesChart'
 import ExpenseTable from '../components/financials/ExpenseTable'
 import FinancialsHeader from '../components/financials/FinancialsHeader'
 import { getDateRangeFromParams, getPriorDateRange } from '../../lib/dateRanges'
+import { isCancelled, isOwnerStay, resolvePropertyFilter } from '../../lib/reservations'
 
 const SOURCE_NAMES: Record<string, string> = {
   'SC-ABnB':  'Airbnb',
   'HAFamOLB': 'Direct',
   'STA':      'Other',
-}
-
-function isOwnerStay(r: any): boolean {
-  return ['OWN', 'Own', 'own'].includes(r.booking_source)
-}
-
-function isCancelled(r: any): boolean {
-  return ['cancelled', 'Cancelled'].includes(r.status)
 }
 
 function buildFinancials(reservations: any[], expenses: any[]) {
@@ -129,23 +122,7 @@ export default async function FinancialsPage({
   if (!allPropertyIds.length) return <EmptyState />
 
   // ── Resolve property filter ────────────────────────────────────────────────
-  const propertyParam = params.property
-  let effectivePropertyIds: string[]
-  let propertyLabel: string
-
-  if (propertyParam && propertyParam !== 'all') {
-    const match = (properties ?? []).find((p: any) => p.id === propertyParam)
-    if (match) {
-      effectivePropertyIds = [propertyParam]
-      propertyLabel = (match as any).name
-    } else {
-      effectivePropertyIds = allPropertyIds
-      propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
-    }
-  } else {
-    effectivePropertyIds = allPropertyIds
-    propertyLabel = allPropertyIds.length === 1 ? (properties as any[])[0].name : 'All Properties'
-  }
+  const { effectivePropertyIds, propertyLabel } = resolvePropertyFilter(properties, params.property)
 
   // ── Fetch data ────────────────────────────────────────────────────────────
   const [
