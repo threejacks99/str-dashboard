@@ -74,6 +74,9 @@ export const COLUMN_MAPPINGS: Record<string, string[]> = {
     'type', 'platform', 'channel', 'source',
     'booking source', 'booking channel'
   ],
+  status: [
+    'status', 'reservation status', 'booking status', 'state'
+  ],
   check_in: [
     'arrive', 'arrive ', ' arrive', 'arrival', 'check in', 'check-in',
     'checkin', 'start date', 'from', 'check in date', 'arrival date'
@@ -162,6 +165,8 @@ export function mapRow(
     } else if (standardField === 'booking_created_at') {
       const parsed = value ? parseDate(value) : null
       mapped[standardField] = parsed ? `${parsed}T00:00:00.000Z` : null
+    } else if (standardField === 'status') {
+      mapped[standardField] = /cancel/i.test(value ?? '') ? 'Cancelled' : 'Confirmed'
     } else {
       mapped[standardField] = sanitizeString(value)
     }
